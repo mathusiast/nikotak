@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Machine Learning in Web Security — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>Machine Learning in Web Security</h1>
+<p class="date"><time datetime="2018-11-19">19 November 2018</time></p>
+<p>Machine learning has gone from a buzzword to something we use in production every day. The idea is simple: instead of being given rules, the computer learns from data. In web security, that changes things for both attackers and defenders.</p>
+
+<h2>Attackers</h2>
+
+<p>Earlier this year, researchers from Yale, Stanford, Oxford and Cambridge published a paper warning about how ML can be misused. Some of what they describe is already happening:</p>
+<ul>
+<li>Hivenets: botnets that evolve from simple networks of bots into self-learning systems.</li>
+<li>Attackers using predictive models that get more precise with every iteration.</li>
+<li>Phishing that gets more convincing as natural language processing improves.</li>
+</ul>
+
+<h2>Defenders</h2>
+
+<p>The same tools work for defense. These are the areas where ML helps us most:</p>
+
+<p><strong>Anomaly detection.</strong> A model learns what normal traffic looks like and flags what doesn't fit.</p>
+
+<p><strong>Zero-day exploits.</strong> Signatures only catch attacks that are already known. A model that learns how legitimate users behave (we use BigQuery ML for this) can flag behavior that doesn't match, even when no signature exists yet.</p>
+
+<p><strong>Automation.</strong> ML takes routine tasks off analysts' plates, so they can spend their time on the cases that need a human.</p>
+
+<p><strong>Prediction.</strong> Supervised models trained on past attacks help us anticipate the next ones.</p>
+
+<p>At Reblaze we run a globally distributed security network in the cloud. An attacker who targets a site we protect isn't facing one standalone system. They're facing a network that uses the full power of cloud computing and learns from traffic everywhere it runs.</p>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>

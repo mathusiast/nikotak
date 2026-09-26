@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>False Positives and Machine Learning, Part 1 — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>False Positives and Machine Learning, Part 1</h1>
+<p class="date"><time datetime="2019-05-29">29 May 2019</time></p>
+<p>A false positive (FP) is when a security system treats legitimate activity as an attack. It sounds like a minor annoyance, but the costs add up:</p>
+<ul>
+<li>E-commerce sites lose real customers.</li>
+<li>Legitimate web crawlers get blocked, which hurts SEO.</li>
+<li>Training data gets contaminated, so the errors compound.</li>
+<li>Resources get pulled away from real threats.</li>
+</ul>
+
+<p>A common suggestion is to find an "optimal ratio" between false positives and false negatives (FNs), based on what each one costs in money. I don't think this approach works. In Part 2 I'll describe what I measure instead.</p>
+
+<h2>Machine learning for security</h2>
+
+<p>ML algorithms used in security fall roughly into two groups.</p>
+
+<p><strong>Shallow learning (SL):</strong></p>
+<ul>
+<li>Supervised: shallow neural networks, HMM, KNN, random forest</li>
+<li>Unsupervised: clustering, association</li>
+<li>Requires a lot of feature engineering</li>
+</ul>
+
+<p><strong>Deep learning (DL):</strong></p>
+<ul>
+<li>Supervised: FNN, RNN, CNN</li>
+<li>Unsupervised: SAE, DBN</li>
+<li>Less need for manual feature selection</li>
+</ul>
+
+<p>To compare approaches, we use the standard metrics:</p>
+<p>False Positive Rate = FP / (FP + TN)<br>
+Accuracy = (TP + TN) / (FP + TP + FN + TN)</p>
+
+<h2>Existing methods</h2>
+
+<p>The research literature has several approaches to reducing FPs:</p>
+<ul>
+<li>parameter tuning in intrusion detection systems (IDS),</li>
+<li>rule-based classification for specific attack types,</li>
+<li>neural network models such as GHSOM,</li>
+<li>two-stage correlation systems.</li>
+</ul>
+
+<h2>From research to production</h2>
+
+<p>Many of these methods look good in papers and then run into problems in production:</p>
+<ul>
+<li>They work offline, but production needs real-time analysis.</li>
+<li>Accuracy doesn't carry over from one organization's traffic to another's.</li>
+<li>Threats change, so models need to adapt continuously.</li>
+<li>Someone has to decide what gets automated and what stays with a human.</li>
+</ul>
+
+<p>In Part 2 I'll go into how we handle these in practice.</p>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>

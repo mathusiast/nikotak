@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CPDoS: Cache-Poisoned Denial of Service — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>CPDoS: Cache-Poisoned Denial of Service</h1>
+<p class="date"><time datetime="2013-10-23">23 October 2013</time></p>
+<p>CPDoS (Cache-Poisoned Denial of Service) is a new kind of attack on CDN and proxy caches. Unlike a traditional DoS attack, it doesn't need a large volume of traffic. The attacker sends a request that makes the origin server return an error. The cache stores the error, and from then on every user who requests that resource gets the error page instead of the content. One request is enough to make a page unavailable for everyone behind that cache.</p>
+
+<p>The attack works because the cache and the origin server handle the same request differently. There are three variants.</p>
+
+<h2>HTTP Header Oversize (HHO)</h2>
+<p>The request includes a header that is within the cache's size limit but over the origin server's limit. Apache's default limit is 8,190 bytes. The cache forwards the request, the origin rejects it with an error, and the cache stores that error.</p>
+
+<h2>HTTP Meta Character (HMC)</h2>
+<p>The request includes a header with meta characters. The cache passes it through, the origin treats it as invalid and returns an error, and the error ends up in the cache.</p>
+
+<h2>HTTP Method Override (HMO)</h2>
+<p>Some frameworks let a header override the HTTP method. The attacker sends an ordinary GET with an override to a method the resource doesn't support, such as DELETE. The origin responds with an error, and the cache stores it as the response to the GET.</p>
+
+<p>None of these rely on a bug in the usual sense. Each component does what it was designed to do, and the problem only appears when you put them together. That makes CPDoS hard to catch with signature-based rules.</p>
+
+<p>At Reblaze we've added protection against these attacks to our WAF.</p>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>

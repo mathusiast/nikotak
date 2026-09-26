@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real-Time Anomaly Detection for Web Traffic with Grafana and ClickHouse — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>Real-Time Anomaly Detection for Web Traffic with Grafana and ClickHouse</h1>
+<p class="date"><time datetime="2023-05-23">23 May 2023</time></p>
+<p>This post describes a real-time anomaly detection system for web traffic that we built with Grafana, ClickHouse and Python. It runs in production and detects DDoS attacks, bot campaigns and credential stuffing.</p>
+
+<p>The short version: it processes 50,000 requests per second, raises an alert within 90 seconds, and produces 85% fewer false positives than the static thresholds it replaced.</p>
+
+<h2>Why thresholds weren't enough</h2>
+<p>Most monitoring alerts on static thresholds. That doesn't work well anymore. Attacks adapt to stay under the limits, and legitimate traffic has become more complicated too, with global users, mobile devices and very different usage patterns. The hard part is telling a harmless spike from an attack.</p>
+
+<h2>Ratios instead of raw volume</h2>
+<p>Instead of watching raw traffic volume, we compute ratios that describe behavior. These stay stable when legitimate traffic grows and change when something unusual happens.</p>
+
+<p><strong>Sessions and identity</strong></p>
+<ul>
+<li>Unique IPs per URI (IP_URI_ratio): how many different sources hit a given resource.</li>
+<li>Sessions per IP (Session_IP_ratio): one IP opening many sessions usually means automation.</li>
+<li>Session duration deviation (Duration_anomaly): session lengths compared with the baseline.</li>
+</ul>
+
+<p><strong>Request patterns</strong></p>
+<ul>
+<li>Requests per endpoint per minute (RPM_endpoint): sudden traffic concentrated on one resource.</li>
+<li>URI diversity per session (URI_diversity): navigation that doesn't look like a real user.</li>
+<li>User agent diversity (UA_diversity): many agent strings from few sources, typical of bot networks.</li>
+</ul>
+
+<p><strong>Errors</strong></p>
+<ul>
+<li>5xx rate per IP segment (Error_rate_IP): sources that are exhausting server resources.</li>
+<li>404 patterns (NotFound_pattern): reconnaissance and vulnerability scanning.</li>
+<li>Response time outliers (Response_outlier): resource exhaustion attacks.</li>
+</ul>
+
+<h2>Architecture</h2>
+<p>There are three components.</p>
+
+<p><strong>Grafana</strong> for visualization and alerting. It connects to ClickHouse natively, so queries run in under a second. Dashboards show anomalies with confidence intervals, detected events are annotated on the timeline, and alerts are routed by severity.</p>
+
+<p><strong>ClickHouse</strong> as the time-series engine. Its columnar storage suits analytical queries. Logs stream in from the web servers in real time, materialized views keep the metrics aggregated continuously, and the history provides the baselines.</p>
+
+<p><strong>A Python detection service</strong>, running in containers. It computes the metrics, builds feature vectors, and scores and classifies anomalies with confidence intervals.</p>
+
+<h2>Detection algorithms</h2>
+<p>No single algorithm catches everything, so the service runs several:</p>
+<ul>
+<li>Statistical: z-scores for quick outlier detection, rolling quantile thresholds with an adaptive baseline, and seasonal decomposition for time patterns.</li>
+<li>Machine learning: Isolation Forest for multivariate anomalies, Prophet for deviations from seasonal patterns, and one-class SVM for novelty detection.</li>
+</ul>
+<p>Each algorithm's output gets a confidence weight, and the outputs are checked against each other before an alert is raised. Requiring agreement between them is what keeps false positives low without losing sensitivity.</p>
+
+<h2>Results</h2>
+<ul>
+<li>Detection latency: 30–90 seconds from event to alert.</li>
+<li>Throughput: 50,000 requests per second across several application instances.</li>
+<li>False positives: 85% lower than with static thresholds.</li>
+<li>Queries: 95% of dashboard queries return in under a second.</li>
+<li>Storage: 85% lower cost thanks to ClickHouse's columnar compression.</li>
+<li>Footprint: 2 CPU cores and 4 GB RAM for the whole detection service, with less than 1% added latency for the application. Storage grows linearly with traffic and is kept in check by retention policies.</li>
+</ul>
+
+<table><thead><tr><th>Metric</th><th>Thresholds</th><th>Our system</th><th>Change</th></tr></thead><tbody><tr><td>False positive rate</td><td>23.4%</td><td>3.5%</td><td>85% reduction</td></tr><tr><td>Detection latency</td><td>5-15 minutes</td><td>30-90 seconds</td><td>75% improvement</td></tr><tr><td>Attack coverage</td><td>34%</td><td>89%</td><td>162% increase</td></tr><tr><td>Operational overhead</td><td>High</td><td>Low</td><td>Significant reduction</td></tr></tbody></table>
+
+<h2>Case 1: credential stuffing</h2>
+<p>A coordinated campaign hit the login endpoints from distributed IP addresses. Several indicators fired together:</p>
+<ul>
+<li>Session_IP_ratio rose 847% above its baseline.</li>
+<li>URI_diversity showed the traffic was focused on authentication endpoints.</li>
+<li>203 different user agents came from just 23 IP addresses.</li>
+<li>The login success rate stayed at zero while attempts went up.</li>
+</ul>
+<p>The attack was detected and mitigated automatically within 2 minutes of starting, before it degraded service for legitimate users. The post-incident analysis confirmed a coordinated bot network using compromised credential databases.</p>
+
+<h2>Case 2: application-layer DDoS</h2>
+<p>This attack targeted the search function, which is expensive to run, while keeping overall request volume normal. Total traffic looked fine; what gave it away was the per-endpoint view:</p>
+<ul>
+<li>Response_outlier flagged server resources running out.</li>
+<li>Error_rate_IP showed the errors concentrated on a small set of sources.</li>
+</ul>
+<p>We applied dynamic rate limiting to the affected endpoints only. Availability stayed above 99% throughout the attack, with little impact on users.</p>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>

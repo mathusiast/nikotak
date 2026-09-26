@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reducing False Positives: An Overview — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>Reducing False Positives: An Overview</h1>
+<p class="date"><time datetime="2021-11-11">11 November 2021</time></p>
+<p>A false positive (FP) is when a security system flags legitimate activity as a threat. FPs waste the security team's time and can disrupt the business, for example by blocking legitimate users or services. The traditional approach has been to trade FPs off against false negatives (FNs). Newer methods give more options.</p>
+
+<h2>Traditional techniques and their limits</h2>
+<ul>
+<li><strong>Threshold tuning.</strong> Adjusting detection thresholds can reduce FPs, but usually increases FNs.</li>
+<li><strong>Rules and heuristics.</strong> Static rules don't adapt. As attacks change, they produce more and more FPs.</li>
+<li><strong>Training periods.</strong> If FPs during a system's training phase aren't dealt with, they turn into bad filtering rules, and the errors compound.</li>
+</ul>
+
+<h2>Newer approaches</h2>
+
+<h3>Machine learning</h3>
+<p>ML models trained on historical alert data learn to separate benign from malicious activity and cut down the noise. Shallow learning algorithms like random forests and support vector machines work well on structured data. Deep learning models such as RNNs and CNNs pick up more complex patterns. Hybrid approaches like deep belief networks have been shown to reduce FPs significantly in intrusion detection systems.</p>
+
+<h3>Behavioral analytics</h3>
+<p>These tools learn a baseline of normal behavior and alert only on statistically significant deviations, so harmless outliers don't trigger alerts.</p>
+
+<h3>Proactive security</h3>
+<p>Predictive models try to anticipate attacker behavior and adjust defenses in real time, with fewer false alarms.</p>
+
+<h3>Prioritization</h3>
+<p>Triage frameworks score alerts by risk and update their prioritization rules as threats change. Analysts see the high-priority alerts first, and low-risk events are filtered out.</p>
+
+<h3>Humans and AI together</h3>
+<p>Automated tools help a lot, but ambiguous cases still need a human. The best setups combine automated detection with analyst judgment.</p>
+
+<h2>Tools</h2>
+<ul>
+<li><strong>SOAR</strong> (Security Orchestration, Automation and Response) automates workflows and connects data sources and tools.</li>
+<li><strong>XDR</strong> (Extended Detection and Response) correlates data from endpoints, networks and cloud environments, which improves detection accuracy and reduces FPs.</li>
+<li><strong>Behavior-based endpoint protection</strong>, such as CrowdStrike and SentinelOne, monitors behavior instead of relying on static rules.</li>
+</ul>
+
+<h2>Real-time vs. offline</h2>
+<p>Most FP reduction methods work offline, analyzing traffic after the fact. Real-time FP reduction is still an open problem. Real-time clustering, anomaly detection and hybrid human-AI systems are starting to address it.</p>
+
+<h2>Open challenges</h2>
+<ul>
+<li><strong>Customization.</strong> Every organization's environment and threats are different.</li>
+<li><strong>Data.</strong> Good models need large, high-quality training datasets.</li>
+<li><strong>People.</strong> Analysts are still needed to refine models and handle edge cases.</li>
+</ul>
+<p>Research is aiming for near-zero FP rates without losing accuracy or efficiency. Federated learning, where models learn together across decentralized systems, is one promising direction.</p>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>

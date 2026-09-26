@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>False Positives and Machine Learning, Part 2 — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>False Positives and Machine Learning, Part 2</h1>
+<p class="date"><time datetime="2021-01-04">4 January 2021</time></p>
+<p>In <a href="false-positives-and-machine-learning-part-1.html">Part 1</a> I described the false positive problem and the usual ways of measuring it. This part covers how threat detection has changed and what I think we should measure instead.</p>
+
+<h2>How detection has changed</h2>
+
+<p>Earlier approaches:</p>
+<ul>
+<li>static rulesets (ACLs, blocklists),</li>
+<li>statistical anomaly detection,</li>
+<li>basic ML analysis.</li>
+</ul>
+
+<p>What we use now:</p>
+<ul>
+<li>ML-based behavioral analytics (UEBA),</li>
+<li>automated parameter tuning,</li>
+<li>business metrics as part of the loop.</li>
+</ul>
+
+<p>The old choice was between statistical methods, which are powerful but complex to run, and static rulesets, which are simple but limited. Automated tuning narrows that gap.</p>
+
+<h2>Measure business outcomes, not just accuracy</h2>
+
+<p>The false positive rate, FP / (FP + TN), and accuracy, (TP + TN) / (FP + TP + FN + TN), don't tell you what a wrong decision costs the business. So I use business outcomes as a security metric:</p>
+<ul>
+<li>Track conversion rates against security decisions. If blocking goes up and conversions go down, something is wrong.</li>
+<li>Use UEBA as a feedback loop.</li>
+<li>Adjust the algorithms based on business impact.</li>
+</ul>
+
+<p>Looking at whole sessions, not single requests, helps a lot here. A sequence of requests shows how a real customer behaves and makes it easier to separate customers from bots.</p>
+
+<h2>What a decision should take into account</h2>
+
+<p>Instead of a plain allow/block, a decision should consider:</p>
+<ul>
+<li>the user's history,</li>
+<li>the business value of the transaction,</li>
+<li>the current threat landscape,</li>
+<li>how much risk the organization is willing to accept.</li>
+</ul>
+
+<p>Policies can then be adjusted automatically as business conditions change.</p>
+
+<p>My main conclusion from this work: security has to support the business, not only stop threats. False positives won't disappear, but when you measure them against business outcomes, they become predictable and manageable.</p>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>

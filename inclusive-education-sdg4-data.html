@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Measuring Inclusive Education with UNESCO&#x27;s SDG 4 Data — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>Measuring Inclusive Education with UNESCO&#x27;s SDG 4 Data</h1>
+<p class="date"><time datetime="2024-08-28">28 August 2024</time></p>
+<p>How do you measure whether inclusive education works? I've been trying to answer that with data from UNESCO's Sustainable Development Goal 4 (SDG 4) database, which the <a href="https://uis.unesco.org/">UNESCO Institute for Statistics</a> publishes. This post is the first in a short series on that work.</p>
+
+<h2>The data</h2>
+<p>We looked at 138 countries between 2013 and 2023 and focused on three areas:</p>
+<ul>
+<li>completion rates at each level of education,</li>
+<li>accessibility of school infrastructure,</li>
+<li>gender parity indices.</li>
+</ul>
+<p>The database is global, but the number of usable data points per metric is small:</p>
+<pre><code># Distribution of data points across metrics
+metrics_distribution = {
+    'Infrastructure metrics': '300+ observations',
+    'Completion rates': '10-12 observations per metric',
+    'Gender parity indices': '13 observations per metric'
+}</code></pre>
+
+<h2>Correlations between students with and without disabilities</h2>
+<p>We compared completion rates for students with and without disabilities:</p>
+<ul>
+<li>Primary: r = 0.234 (p = 0.464, n = 12)</li>
+<li>Lower secondary: r = 0.281 (p = 0.376, n = 12)</li>
+<li>Upper secondary: r = 0.081 (p = 0.823, n = 10)</li>
+</ul>
+<p>The correlations are weak, and with 10 to 12 countries per level none of them is statistically significant. So a country doing well for students without disabilities isn't necessarily doing well for students with disabilities. That's a real question for how well current inclusive education policies work.</p>
+
+<h2>Working with the data</h2>
+<p><strong>Small samples.</strong> Reporting is inconsistent, so many metrics have only a handful of observations. We used bootstrap resampling to get confidence intervals:</p>
+<pre><code>def bootstrap_correlation(x, y, n_iterations=10000):
+    correlations = []
+    for _ in range(n_iterations):
+        idx = np.random.randint(0, len(x), len(x))
+        r = stats.pearsonr(x[idx], y[idx])[0]
+        correlations.append(r)
+
+    ci = np.percentile(correlations, [2.5, 97.5])
+    return np.mean(correlations), ci</code></pre>
+
+<p><strong>Uneven data quality.</strong> Countries collect and report data differently. We weighted the analysis by data reliability scores.</p>
+
+<p><strong>Missing years.</strong> Countries don't all report in the same years, which makes trends hard to compare. We used sliding time windows:</p>
+<pre><code>def analyze_time_window(data, window_size=3):
+    """
+    Analyze data within sliding time windows to handle temporal inconsistency
+    """
+    windows = []
+    for year in range(data['Year'].min(), data['Year'].max() - window_size + 1):
+        window_data = data[(data['Year'] &gt;= year) &amp; 
+                          (data['Year'] &lt; year + window_size)]
+        windows.append({
+            'period': f'{year}-{year+window_size}',
+            'mean': window_data['Value'].mean(),
+            'std': window_data['Value'].std(),
+            'n_countries': window_data['Country'].nunique()
+        })
+    return pd.DataFrame(windows)</code></pre>
+
+<h2>What we found</h2>
+<p><strong>Infrastructure.</strong> Schools with adapted infrastructure have consistently higher completion rates. The effect is strongest in primary education and varies a lot by region.</p>
+<p><strong>Gender.</strong> Gender parity is improving over time. Where gender and disability intersect, the patterns are complex. Regional differences in gender parity are larger in secondary education.</p>
+<p><strong>Completion gaps.</strong> The gap between students with and without disabilities grows at higher levels of education. Some regions have consistently smaller gaps, which suggests they are doing something right. Economic factors are strongly correlated with the size of the gap.</p>
+
+<h2>What this means for policy</h2>
+<ul>
+<li><strong>Start early.</strong> The gap grows as students move up, so support should start in primary school.</li>
+<li><strong>Invest in infrastructure.</strong> Adapted infrastructure is clearly linked to higher completion rates.</li>
+<li><strong>Learn from the regions that do well.</strong> Regions with smaller gaps are worth studying.</li>
+</ul>
+
+<h2>Further reading</h2>
+<ul>
+<li>Baker, R. S. (2019). "Challenges for the Future of Educational Data Mining"</li>
+<li>Ainscow, M., &amp; Messiou, K. (2018). "Engaging with the views of students to promote inclusion in education"</li>
+</ul>
+
+<p>The next posts in this series: <a href="predicting-education-completion-rates.html">predictive modeling of completion rates</a>, <a href="inclusive-education-regional-case-studies.html">regional case studies</a>, and <a href="visualizing-education-data.html">visualization techniques</a>.</p>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>

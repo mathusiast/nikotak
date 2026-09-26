@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rate Limiting Beyond Static Thresholds — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>Rate Limiting Beyond Static Thresholds</h1>
+<p class="date"><time datetime="2020-10-06">6 October 2020</time></p>
+<p>Rate limiting identifies hostile traffic by how often requests arrive. The basic version is a static threshold: block a source that sends more than X requests in Y seconds. It's simple, and it works up to a point.</p>
+
+<p>Take a login page. A legitimate user usually gets in within one to three attempts. An attacker might try dozens of times in a few minutes. Count the attempts, block above a threshold, and you've stopped the simple case.</p>
+
+<h2>What rate limiting catches</h2>
+
+<p><strong>DDoS attacks.</strong> Excessive request volume from one or many sources.</p>
+<p><strong>Credential stuffing.</strong> Repeated logins with stolen credentials, often spread across many sources so that no single one crosses the threshold.</p>
+<p><strong>Brute force.</strong> Systematic guessing of credentials.</p>
+<p><strong>Scraping and data theft.</strong> High-frequency access to content or data.</p>
+<p><strong>Inventory denial.</strong> Bots that start transactions over and over to hold stock so real buyers can't get it.</p>
+
+<h2>Where static thresholds fail</h2>
+
+<p>Static limits need careful manual configuration. Set them too low and you block legitimate users. Set them too high and attacks get through. And the right value changes: a sale or a product launch can multiply legitimate traffic, while a distributed attack can stay under every per-source limit.</p>
+
+<p>Rate limiting has developed in three steps:</p>
+<ul>
+<li>Thresholds: from fixed values per URL or endpoint, to dynamic values based on historical traffic, to thresholds adjusted by ML.</li>
+<li>Scope: from counting per source to recognizing patterns across sources.</li>
+<li>Context: taking into account what the request is and what blocking it would cost the business.</li>
+</ul>
+
+<h2>What an adaptive system should do</h2>
+<ul>
+<li>Learn normal traffic patterns automatically.</li>
+<li>Adjust thresholds by business impact, for example raising them during high-traffic events.</li>
+<li>Tell high-volume legitimate buyers apart from inventory-denial bots.</li>
+<li>Catch distributed attacks before any single source reaches a threshold.</li>
+</ul>
+
+<p>The goal is protection that doesn't cost legitimate users their access.</p>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>

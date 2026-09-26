@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security Across Multiple Clouds — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>Security Across Multiple Clouds</h1>
+<p class="date"><time datetime="2019-07-11">11 July 2019</time></p>
+<p>Multi-cloud is now a standard business strategy. The hybrid cloud market is expected to reach $97.64 billion by 2023, and 81% of enterprises already use more than one cloud.</p>
+
+<p>Each cloud provider has good security tools, but they only work inside that provider's environment. Once you run on two or three clouds, that becomes the main problem. I see it in four areas.</p>
+
+<h2>Governance and visibility</h2>
+<p>Each platform has its own tools, like AWS CloudTrail or Azure audit logs. Policies have to be replicated by hand on each platform, and nobody has a view across all of them.</p>
+
+<h2>Security design</h2>
+<p>Each provider needs its own architecture. Integrating the different security controls is complex, and keeping them coordinated across platforms is manual work.</p>
+
+<h2>Tool selection</h2>
+<p>Tools that work with one provider may not work with another. Data formats and standards differ, integration options are limited, and pricing is hard to predict.</p>
+
+<h2>The team</h2>
+<p>Each platform needs its own expertise. Training takes time, and knowledge ends up split between people who each know one cloud.</p>
+
+<h2>What to do</h2>
+
+<p>I recommend starting with the foundation:</p>
+<ul>
+<li>unified logging and monitoring across all platforms,</li>
+<li>visibility across platforms,</li>
+<li>consistent security baselines.</li>
+</ul>
+
+<p>After that:</p>
+<ul>
+<li><strong>Centralized traffic management</strong>, so threats are detected and handled the same way on every platform.</li>
+<li><strong>Identity management</strong> that applies the same access control everywhere.</li>
+<li><strong>Event correlation</strong> across platforms, so an attack that touches two clouds shows up as one incident, not two.</li>
+<li><strong>Cross-platform skills</strong> in the team, with operations assisted by automation where possible.</li>
+</ul>
+
+<p>The aim is to replace a set of separate security setups, one per cloud, with one system that covers all of them.</p>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>

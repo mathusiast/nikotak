@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BigQuery ML at Google Cloud Next &#x27;18 — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>BigQuery ML at Google Cloud Next &#x27;18</h1>
+<p class="date"><time datetime="2018-07-27">27 July 2018</time></p>
+<p>At the Wednesday morning keynote of Google Cloud Next '18, Google announced BigQuery Machine Learning (BQML). Reblaze was part of that announcement. In the same keynote, Google demonstrated Cloud Armor by running a live DDoS attack against a site we protect.</p>
+
+<p>The demo didn't mention that we had been using BQML for a while already. Reblaze was in the closed pre-alpha, and our use cases were some of the ones that pushed it.</p>
+
+<h2>Why BQML matters to us</h2>
+
+<p>BQML lets you build and run machine learning models in SQL, inside BigQuery, right where the data is. Our traffic data is already in BigQuery, so this removes a whole step: no exporting data and no separate ML environment to maintain.</p>
+
+<p>We analyze billions of HTTP/S transactions. Serverless big data gives us:</p>
+<ul>
+<li>data capture and access without managing any infrastructure,</li>
+<li>distributed storage that can be reached from anywhere,</li>
+<li>the usual SaaS advantages: lower cost and remote management.</li>
+</ul>
+
+<p>At launch, BQML supports two model types: linear regression and binary logistic regression. It's a small start, but it already covers a lot of what we need.</p>
+
+<h2>How it fits Reblaze</h2>
+
+<p>Reblaze is single-tenant. Every customer runs in their own Virtual Private Cloud, so each customer's models learn from that customer's traffic and stay isolated from everyone else's.</p>
+
+<p>We ship Reblaze as rolling updates, and more of this work will go into them over time.</p>
+
+<p>If you want to try it, Reblaze is available for free on the Google Cloud Marketplace and takes a few clicks to deploy.</p>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>

@@ -3,40 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Advanced Visualization Techniques for Educational Data: Beyond Basic Charts — NikoTak</title>
+<title>Visualizing Education Data — NikoTak</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
 <main>
 <article>
-<h1>Advanced Visualization Techniques for Educational Data: Beyond Basic Charts</h1>
+<h1>Visualizing Education Data</h1>
 <p class="date"><time datetime="2024-10-25">25 October 2024</time></p>
-<h2>Introduction</h2>
+<p>The last post in my series on UNESCO's SDG 4 data. Standard charts don't show much of what matters in education data. The metrics depend on each other, the data is hierarchical (region, country, level), it changes over time and by geography, and a lot of it is missing. These are the plots I found most useful, all built with Plotly.</p>
 
-<p>When visualizing educational data, particularly for inclusive education metrics, standard charts often don't tell the complete story. Through my work with UNESCO's SDG 4 database, I've developed several advanced visualization techniques that better represent the complex relationships in educational data.</p>
-
-<h2>The Visualization Challenge</h2>
-
-<p>Educational data presents unique visualization challenges:</p>
-
-<ul>
-<li>Multiple interconnected metrics</li>
-
-<li>Hierarchical relationships</li>
-
-<li>Temporal patterns</li>
-
-<li>Geographic variations</li>
-
-<li>Missing data patterns</li>
-</ul>
-
-<h2>1. Interactive Correlation Matrices</h2>
-
-<p>First, let's look at an advanced correlation matrix visualization:</p>
-
-<pre>def create_interactive_correlation_matrix(df):
+<h2>1. Interactive correlation matrix</h2>
+<p>A heatmap where each cell shows its r value, both on hover and as a label:</p>
+<pre><code>def create_interactive_correlation_matrix(df):
     import plotly.graph_objects as go
 
     # Calculate correlations
@@ -73,13 +53,11 @@
         annotations=annotations
     )
 
-    return fig</pre>
+    return fig</code></pre>
 
-<h2>2. Multi-Level Sunburst Charts</h2>
-
-<p>For hierarchical data representation:</p>
-
-<pre>def create_education_sunburst(df):
+<h2>2. Sunburst for hierarchical data</h2>
+<p>Region, then country, then education level, then disability status, all in one chart:</p>
+<pre><code>def create_education_sunburst(df):
     import plotly.express as px
 
     # Prepare hierarchical data
@@ -102,13 +80,11 @@
     )
 
     fig.update_layout(title="Educational Completion Rates Hierarchy")
-    return fig</pre>
+    return fig</code></pre>
 
-<h2>3. Geospatial Visualization with Time Series</h2>
-
-<p>Combining geographic and temporal data:</p>
-
-<pre>def create_animated_choropleth(df):
+<h2>3. Animated map</h2>
+<p>A choropleth with a time slider shows geography and change over time together:</p>
+<pre><code>def create_animated_choropleth(df):
     import plotly.express as px
 
     fig = px.choropleth(
@@ -126,13 +102,11 @@
         coloraxis_colorbar_title="Completion Rate (%)"
     )
 
-    return fig</pre>
+    return fig</code></pre>
 
-<h2>4. Advanced Time Series Visualization</h2>
-
-<p>For temporal pattern analysis:</p>
-
-<pre>def create_advanced_time_series(df):
+<h2>4. Time series with two axes and a confidence band</h2>
+<p>Completion rate and infrastructure score on the same chart, with the 95% confidence interval shaded:</p>
+<pre><code>def create_advanced_time_series(df):
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
 
@@ -174,13 +148,11 @@
         secondary_y=False
     )
 
-    return fig</pre>
+    return fig</code></pre>
 
-<h2>5. Sankey Diagrams for Educational Pathways</h2>
-
-<p>Visualizing student progression:</p>
-
-<pre>def create_education_sankey(df):
+<h2>5. Sankey diagram of student pathways</h2>
+<p>How students move from one level to the next, and where they drop out:</p>
+<pre><code>def create_education_sankey(df):
     import plotly.graph_objects as go
 
     fig = go.Figure(data=[go.Sankey(
@@ -200,25 +172,17 @@
     )])
 
     fig.update_layout(title_text="Educational Progression Pathways")
-    return fig</pre>
+    return fig</code></pre>
 
-<h2>Best Practices for Educational Data Visualization</h2>
-
-<ol>
-<li><strong>Color Usage</strong></li>
-</ol>
-
-<pre>color_schemes = {
+<h2>Colors and accessibility</h2>
+<p>Use qualitative palettes for categories, sequential palettes for values, and diverging palettes for anything with a meaningful midpoint, like correlations:</p>
+<pre><code>color_schemes = {
     'categorical': px.colors.qualitative.Set3,
     'sequential': px.colors.sequential.Viridis,
     'diverging': px.colors.diverging.RdBu
-}</pre>
-
-<ol start="2">
-<li><strong>Accessibility Considerations</strong></li>
-</ol>
-
-<pre>def make_accessible_visualization(fig):
+}</code></pre>
+<p>Keep fonts large, give the chart enough room, and always show the legend:</p>
+<pre><code>def make_accessible_visualization(fig):
     fig.update_layout(
         font=dict(size=14),
         height=600,
@@ -226,73 +190,33 @@
         showlegend=True,
         coloraxis_colorbar_title_font_size=12
     )
-    return fig</pre>
+    return fig</code></pre>
 
-<h2>Implementation Examples</h2>
-
-<p>Let's look at some real-world applications:</p>
-
-<ol>
-<li><strong>Completion Rate Analysis</strong></li>
-</ol>
-
-<pre>def visualize_completion_rates():
+<h2>Putting it together</h2>
+<p>Completion rates over time:</p>
+<pre><code>def visualize_completion_rates():
     fig = create_advanced_time_series(completion_data)
     fig.update_layout(
         title="Completion Rates Across Educational Levels",
         xaxis_title="Year",
         yaxis_title="Completion Rate (%)"
     )
-    return fig</pre>
-
-<ol start="2">
-<li><strong>Regional Comparisons</strong></li>
-</ol>
-
-<pre>def visualize_regional_comparison():
+    return fig</code></pre>
+<p>Regional comparison:</p>
+<pre><code>def visualize_regional_comparison():
     fig = create_animated_choropleth(regional_data)
     fig.update_layout(
         title="Regional Variations in Educational Outcomes",
         geo=dict(showframe=False, showcoastlines=True)
     )
-    return fig</pre>
+    return fig</code></pre>
 
-<h2>Resources and Further Reading</h2>
-
-<ol>
-<li>Data Visualization:</li>
-</ol>
-
+<h2>Further reading</h2>
 <ul>
 <li>Cairo, A. (2016). "The Truthful Art: Data, Charts, and Maps for Communication"</li>
-
 <li>Munzner, T. (2014). "Visualization Analysis and Design"</li>
-</ul>
-
-<ol>
-<li>Educational Data:</li>
-</ol>
-
-<ul>
 <li>Romero, C., &amp; Ventura, S. (2020). "Educational Data Mining and Learning Analytics"</li>
-
 <li>Williamson, B. (2017). "Big Data in Education"</li>
-</ul>
-
-<h2>Next Steps</h2>
-
-<p>Future posts will explore:</p>
-
-<ul>
-<li>Interactive dashboard creation</li>
-
-<li>Real-time visualization techniques</li>
-
-<li>Machine learning visualization</li>
-
-<li>Custom visualization libraries for education data</li>
-
-<li></li>
 </ul>
 </article>
 </main>

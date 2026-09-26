@@ -3,24 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Predictive Modeling for Education Completion Rates: A Data Science Deep Dive — NikoTak</title>
+<title>Predicting Education Completion Rates — NikoTak</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
 <main>
 <article>
-<h1>Predictive Modeling for Education Completion Rates: A Data Science Deep Dive</h1>
+<h1>Predicting Education Completion Rates</h1>
 <p class="date"><time datetime="2024-09-10">10 September 2024</time></p>
-<h2>Introduction</h2>
+<p>This is the second post in my series on UNESCO's SDG 4 data (the <a href="inclusive-education-sdg4-data.html">first one</a> covers the data itself). Here I describe how we built models to predict completion rates, and what we had to change to make standard methods work on education data.</p>
 
-<p>Predicting educational completion rates, particularly in inclusive education settings, presents a fascinating machine learning challenge. Having worked with UNESCO's SDG 4 database, I've discovered that traditional predictive modeling approaches need significant adaptation to handle the unique characteristics of educational data. In this post, I'll share our approach to building predictive models for education completion rates, including the challenges we faced and the solutions we implemented.</p>
-
-<h2>The Modeling Challenge</h2>
-
-<p>Our primary objective was to predict completion rates across three educational levels while accounting for disability status. Here's what makes this prediction task particularly interesting:</p>
-
-<pre># Key features in our prediction task
+<h2>The task</h2>
+<p>We predict completion rates at three levels of education, taking disability status into account. The features fall into three groups:</p>
+<pre><code># Key features in our prediction task
 feature_categories = {
     'Infrastructure': [
         'adapted_infrastructure_percentage',
@@ -37,13 +33,11 @@ feature_categories = {
         'parent_engagement_score',
         'community_support_index'
     ]
-}</pre>
+}</code></pre>
 
-<h2>Data Preparation and Feature Engineering</h2>
-
-<p>One of the most critical steps in our modeling process was feature engineering. Here's how we approached it:</p>
-
-<pre>def prepare_features(df):
+<h2>Feature engineering and missing data</h2>
+<p>We added time-based features (years since the country's first record), interaction terms such as infrastructure × funding, and regional averages so each country can be compared with its region. Missing values are filled differently by type: regional averages for infrastructure metrics, interpolation over time for economic indicators.</p>
+<pre><code>def prepare_features(df):
     # Create time-based features
     df['years_of_inclusion'] = df.groupby('Country')['Year'].transform(
         lambda x: x - x.min())
@@ -70,17 +64,11 @@ def impute_missing_values(df):
     for col in economic_cols:
         df[col] = df.groupby('Country')[col].interpolate(method='time')
 
-    return df</pre>
+    return df</code></pre>
 
-<h2>Model Selection and Evaluation</h2>
-
-<p>We experimented with several modeling approaches:</p>
-
-<ol>
-<li><strong>Base Models</strong></li>
-</ol>
-
-<pre>from sklearn.ensemble import RandomForestRegressor
+<h2>Models</h2>
+<p>We compared random forest, lasso regression and XGBoost:</p>
+<pre><code>from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LassoCV
 from xgboost import XGBRegressor
 
@@ -112,17 +100,11 @@ def train_evaluate_models(X_train, y_train, X_test, y_test):
             'mae': mean_absolute_error(y_test, predictions)
         }
 
-    return results</pre>
+    return results</code></pre>
 
-<h2>Key Findings from Model Performance</h2>
-
-<p>Our analysis revealed several interesting patterns:</p>
-
-<ol>
-<li><strong>Model Performance by Education Level</strong></li>
-</ol>
-
-<pre>performance_metrics = {
+<h2>Results</h2>
+<p>Accuracy goes down as the education level goes up:</p>
+<pre><code>performance_metrics = {
     'primary': {
         'RMSE': 8.2,
         'R²': 0.76,
@@ -138,35 +120,25 @@ def train_evaluate_models(X_train, y_train, X_test, y_test):
         'R²': 0.68,
         'MAE': 9.1
     }
-}</pre>
+}</code></pre>
 
-<ol start="2">
-<li><strong>Feature Importance</strong><br/>The most predictive features varied by education level:</li>
-</ol>
-
+<p>The most important features are different at each level.</p>
+<p>Primary education:</p>
 <ul>
-<li>Primary Education:</li>
-
-<li>Teacher training level (0.28)</li>
-
-<li>Adapted infrastructure (0.25)</li>
-
-<li>Parent engagement (0.18)</li>
-
-<li>Secondary Education:</li>
-
-<li>Economic indicators (0.31)</li>
-
-<li>Infrastructure accessibility (0.24)</li>
-
-<li>Community support (0.17)</li>
+<li>teacher training level (0.28)</li>
+<li>adapted infrastructure (0.25)</li>
+<li>parent engagement (0.18)</li>
+</ul>
+<p>Secondary education:</p>
+<ul>
+<li>economic indicators (0.31)</li>
+<li>infrastructure accessibility (0.24)</li>
+<li>community support (0.17)</li>
 </ul>
 
-<h2>Handling Class Imbalance and Bias</h2>
-
-<p>Educational data often suffers from class imbalance and potential biases. We implemented several techniques to address these issues:</p>
-
-<pre>def handle_imbalance(X, y):
+<h2>Imbalance and bias</h2>
+<p>The data is unbalanced. SMOTE normally works on classes, so we bin the continuous target, oversample, and convert back:</p>
+<pre><code>def handle_imbalance(X, y):
     # SMOTE for continuous target variable
     from sklearn.preprocessing import KBinsDiscretizer
     from imblearn.over_sampling import SMOTE
@@ -182,13 +154,11 @@ def train_evaluate_models(X_train, y_train, X_test, y_test):
     # Convert back to continuous
     y_balanced = kbd.inverse_transform(y_binned_balanced)
 
-    return X_balanced, y_balanced</pre>
+    return X_balanced, y_balanced</code></pre>
 
-<h2>Model Interpretability</h2>
-
-<p>Understanding model predictions is crucial for educational policy-making. We used SHAP values to explain our models:</p>
-
-<pre>import shap
+<h2>Interpretability</h2>
+<p>If a model is going to inform policy, people have to be able to see why it predicts what it does. We used SHAP values:</p>
+<pre><code>import shap
 
 def explain_predictions(model, X):
     explainer = shap.TreeExplainer(model)
@@ -198,118 +168,29 @@ def explain_predictions(model, X):
     shap.summary_plot(shap_values, X)
 
     # Generate per-instance explanations
-    return shap_values</pre>
+    return shap_values</code></pre>
 
-<h2>Practical Applications and Limitations</h2>
-
-<p>Our predictive models have several practical applications:</p>
-
-<ol>
-<li><strong>Early Warning Systems</strong></li>
-</ol>
-
+<h2>Uses</h2>
 <ul>
-<li>Identifying students at risk of non-completion</li>
-
-<li>Targeting interventions effectively</li>
-
-<li>Resource allocation optimization</li>
+<li><strong>Early warning:</strong> identifying students at risk of not completing, targeting interventions, allocating resources.</li>
+<li><strong>Policy planning:</strong> prioritizing infrastructure investment and designing teacher training programs.</li>
+<li><strong>Monitoring:</strong> tracking whether interventions work and measuring the effect of policy.</li>
 </ul>
 
-<ol>
-<li><strong>Policy Planning</strong></li>
-</ol>
-
+<h2>Next improvements</h2>
 <ul>
-<li>Infrastructure investment prioritization</li>
-
-<li>Teacher training program design</li>
-
-<li>Resource allocation strategies</li>
+<li>More data: socioeconomic indicators, health and wellbeing metrics, availability of educational resources.</li>
+<li>Better models: deep learning for time patterns, hierarchical models for regional effects, and causal analysis.</li>
 </ul>
 
-<ol>
-<li><strong>Progress Monitoring</strong></li>
-</ol>
-
-<ul>
-<li>Tracking intervention effectiveness</li>
-
-<li>Adjusting support systems</li>
-
-<li>Measuring policy impact</li>
-</ul>
-
-<h2>Looking Forward: Future Improvements</h2>
-
-<p>Areas for future model enhancement include:</p>
-
-<ol>
-<li><strong>Incorporating Additional Data Sources</strong></li>
-</ol>
-
-<ul>
-<li>Socioeconomic indicators</li>
-
-<li>Health and wellness metrics</li>
-
-<li>Educational resource availability</li>
-</ul>
-
-<ol>
-<li><strong>Advanced Modeling Techniques</strong></li>
-</ol>
-
-<ul>
-<li>Deep learning for temporal patterns</li>
-
-<li>Hierarchical models for regional effects</li>
-
-<li>Causality analysis</li>
-</ul>
-
-<h2>Resources and Further Reading</h2>
-
-<ol>
-<li>Educational Data Mining:</li>
-</ol>
-
+<h2>Further reading</h2>
 <ul>
 <li>Baker, R. S. (2019). "Challenges for the Future of Educational Data Mining"</li>
-
 <li>Romero, C., &amp; Ventura, S. (2020). "Educational Data Mining and Learning Analytics"</li>
-</ul>
-
-<ol>
-<li>Predictive Modeling in Education:</li>
-</ol>
-
-<ul>
 <li>Hernández-Leo, D., et al. (2019). "Analytics for Learning Design"</li>
-
 <li>Gardner, J., &amp; Brooks, C. (2018). "Student Success Prediction in MOOCs"</li>
-</ul>
-
-<ol>
-<li>Model Interpretability:</li>
-</ol>
-
-<ul>
 <li>Molnar, C. (2019). "Interpretable Machine Learning"</li>
-
 <li>Lundberg, S. M., &amp; Lee, S. I. (2017). "A Unified Approach to Interpreting Model Predictions"</li>
-</ul>
-
-<h2>Next Steps</h2>
-
-<p>In future posts, we'll explore:</p>
-
-<ul>
-<li>Time series forecasting for educational outcomes</li>
-
-<li>Causal inference in educational data</li>
-
-<li>Multi-level modeling for nested educational data</li>
 </ul>
 </article>
 </main>
