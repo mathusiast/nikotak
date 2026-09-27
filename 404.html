@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Page not found — NikoTak</title>
+<link rel="stylesheet" href="/style.css">
+<script>
+// Old WordPress URLs (/YYYY/MM/DD/<slug>/) -> new pages
+(function () {
+  var map = {
+    "inspired-by-marie-curie": "inspired-by-marie-curie",
+    "from-bqml-to-transformer-based-security-a-data-scientists-vision": "bigquery-ml-at-google-cloud-next-18",
+    "from-machine-learning-to-transformers-a-data-scientists-vision-for-web-security": "machine-learning-in-web-security",
+    "the-evolution-of-false-positive-reduction-from-traditional-ml-to-transformer-architecture-part-1": "false-positives-and-machine-learning-part-1",
+    "the-evolution-of-false-positive-reduction-a-data-scientists-journey-from-ml-to-business-centric-ai-part-2": "false-positives-and-machine-learning-part-2",
+    "cpdos-the-evolution-of-cache-poisoning-attacks-and-our-path-forward": "cpdos-cache-poisoned-denial-of-service",
+    "rate-limiting-evolution-from-static-rules-to-intelligent-adaptive-defense": "rate-limiting-beyond-static-thresholds",
+    "multi-cloud-security-evolution-a-data-scientists-vision-for-unified-intelligent-protection": "security-across-multiple-clouds",
+    "reducing-false-positives-in-cybersecurity-advanced-techniques-and-modern-innovations": "reducing-false-positives",
+    "real-time-anomaly-detection-for-web-traffic-using-grafana-and-clickhouse": "real-time-anomaly-detection-grafana-clickhouse",
+    "analyzing-inclusive-education-through-data-science-insights-from-unescos-sdg-4-database": "inclusive-education-sdg4-data",
+    "predictive-modeling-for-education-completion-rates-a-data-science-deep-dive": "predicting-education-completion-rates",
+    "regional-case-studies-of-successful-inclusive-education-programs-a-data-driven-analysis": "inclusive-education-regional-case-studies",
+    "172": "visualizing-education-data",
+    "leveraging-large-language-models-llms-for-business-documentation-customer-conversations-and-data-insights": "llms-in-business"
+  };
+  var parts = location.pathname.split("/").filter(Boolean);
+  var slug = parts.length ? decodeURIComponent(parts[parts.length - 1]).toLowerCase() : "";
+  if (map[slug]) location.replace("/" + map[slug] + ".html");
+})();
+</script>
+</head>
+<body>
+<header><a class="site" href="/">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<h1>Page not found</h1>
+<p>This page doesn't exist. All posts are listed on the <a href="/">home page</a>.</p>
+</main>
+</body>
+</html>
