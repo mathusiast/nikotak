@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Tragic Alley of the LLM — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+<style>
+figure{margin:1.5rem 0}
+figure svg{width:100%;height:auto;display:block;font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif}
+figcaption{font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;color:var(--muted);font-size:.8rem;margin-top:.5rem}
+</style>
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>The Tragic Alley of the LLM</h1>
+<p class="date"><time datetime="2026-09-27">27 September 2026</time></p>
+
+<p>The attacker and the defender download the same weights. One of them is already using them to get past the other's web application firewall; the other, as of this month, cannot use them in the place where it would matter. Two earlier articles on this blog worked through the evidence for that (<a href="next-gen-waf.html">what the measurements say</a>, <a href="next-gen-waf-what-can-be-done.html">what can be done anyway</a>). This one is about why the asymmetry exists, where it holds, where it does not, and why the way out is the same in every case.</p>
+
+<p>The short version: the asymmetry is not about who has the model. It is about the time budget of the decision. An attacker uses the model offline, needs one success out of many attempts, pays nothing for a wrong guess, and gets to iterate against a defence he can observe. A defender must be right on every input, inline or nearly so, with a false-positive cost paid by legitimate users, on a distribution the attacker chooses. Generative models are very good at the first job and, on every measurement I have found, not yet good at the second.</p>
+
+<h2>The shape of the asymmetry</h2>
+
+<p>Put the two sides in a picture and the asymmetry stops looking like a property of the technology. It is a property of the row.</p>
+
+<figure>
+<svg viewBox="0 0 760 384" role="img" aria-label="The asymmetry is the clock on the defender's decision, not the model" font-size="11.5">
+<text x="24" y="28" font-size="15" font-weight="600" style="fill:var(--fg)">The asymmetry is the clock on the defender's decision, not the model</text>
+<text x="24" y="56" font-weight="600" style="fill:var(--muted)">Offline versus offline: symmetric</text>
+<g>
+<rect x="24" y="66" width="300" height="88" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="36" y="90" font-size="13" font-weight="600" style="fill:var(--fg)">Attacker, offline</text>
+<text x="36" y="110" style="fill:var(--fg)">many attempts, one success is enough</text>
+<text x="36" y="126" style="fill:var(--fg)">no cost for a wrong guess</text>
+<text x="36" y="142" style="fill:var(--fg)">iterates against a defence it can see</text>
+<line x1="324" y1="110" x2="436" y2="110" stroke-width="1.25" stroke-dasharray="4 4" style="stroke:var(--muted)"/>
+<text x="380" y="102" text-anchor="middle" style="fill:var(--muted)">same weights</text>
+<rect x="436" y="66" width="300" height="88" rx="8" fill-opacity="0.12" stroke-width="2" style="fill:var(--link);stroke:var(--link)"/>
+<text x="448" y="90" font-size="13" font-weight="600" style="fill:var(--fg)">Defender, offline</text>
+<text x="448" y="110" style="fill:var(--fg)">same compute, same model, own data</text>
+<text x="448" y="126" style="fill:var(--fg)">must find all of them, then deploy</text>
+<text x="448" y="142" style="fill:var(--fg)">the race is compute and patch lag</text>
+</g>
+<text x="24" y="178" style="fill:var(--muted)">vulnerability discovery, patching, malware analysis, red-teaming your own detector, building training data</text>
+<line x1="24" y1="196" x2="736" y2="196" style="stroke:var(--rule)"/>
+<text x="24" y="222" font-weight="600" style="fill:var(--muted)">Offline versus inline: asymmetric</text>
+<g>
+<rect x="24" y="232" width="300" height="104" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="36" y="256" font-size="13" font-weight="600" style="fill:var(--fg)">Attacker, offline</text>
+<text x="36" y="276" style="fill:var(--fg)">seconds per generated variant</text>
+<text x="36" y="292" style="fill:var(--fg)">sends only the ones that got through</text>
+<text x="36" y="308" style="fill:var(--fg)">chooses the distribution</text>
+<line x1="324" y1="284" x2="436" y2="284" stroke-width="1.25" stroke-dasharray="4 4" style="stroke:var(--muted)"/>
+<text x="380" y="276" text-anchor="middle" style="fill:var(--muted)">same weights</text>
+<rect x="436" y="232" width="300" height="104" rx="8" fill="#d9962b" fill-opacity="0.12" stroke="#d9962b" stroke-width="2"/>
+<text x="448" y="256" font-size="13" font-weight="600" style="fill:var(--fg)">Defender, inline</text>
+<text x="448" y="276" style="fill:var(--fg)">microseconds per request, every request</text>
+<text x="448" y="292" style="fill:var(--fg)">a false positive costs a real user</text>
+<text x="448" y="308" style="fill:var(--fg)">no retry, no second look</text>
+<text x="448" y="324" style="fill:var(--muted)">the model cannot fit the budget</text>
+</g>
+<text x="24" y="360" style="fill:var(--muted)">payload inspection, phishing filtering, bot and agent detection, liveness checks, prompt-injection guards</text>
+</svg>
+<figcaption>Two rows: who is under the clock decides whether the model helps both sides or one.</figcaption>
+</figure>
+
+<p>In the top row both sides work offline. The model looks for a bug in a codebase, or writes a rule from a cluster of attacks, or rewrites a payload into a thousand variants, and it does the same work at the same speed for whoever is running it. Whatever advantage remains is not about the model: it is about how many findings each side needs and how fast each side can act on one.</p>
+
+<p>In the bottom row only the defender is under the clock. The attacker still generates offline, at seconds per variant, and only sends the variants that got through in his own testing. The defender has to answer each of those in the request path, in the <a href="https://blog.cloudflare.com/making-waf-ai-models-go-brr/">275 microseconds</a> that a production WAF pipeline actually has, with a wrong answer costing a legitimate user, on a distribution the attacker chose. That is the alley: the model that made the attack cheap is exactly the model that cannot fit the defender's budget.</p>
+
+<h2>Where it is symmetric</h2>
+
+<p>Zero-day discovery is the case people reach for first, and it is the one where the asymmetry is smallest. By the time an attacker has a model reading a codebase for a bug, a defender can have the same model reading the same codebase for the same bug, and patch generation is exploit generation with the sign flipped. A June 2026 study put Claude Opus 4.6, GPT-5.4 and three self-hosted open models against four WordPress plugins with known vulnerabilities; the best found 63% of them, the best open model 48%, in 32 GPU-hours (<a href="https://arxiv.org/html/2606.21397v1">arXiv 2606.21397</a>). Read as an offensive tool that is a strong result, because an attacker needs one of the 63%; read as a defensive audit it is a weak one, because a defender needs the other 37% too. But the tool is the same tool, at the same speed, for both.</p>
+
+<p>What separates the two sides in this row is not the model but two things the model does not touch: how many findings each side needs, and what each side has to do with a finding. The attacker needs one and can act on it immediately. The defender needs all of them and then has to ship a fix through a release pipeline, and the window between the first finding and the last deployed patch is the window the attacker lives in. That window existed before language models and is not widened by them; if anything, cheaper discovery on both sides shortens it. The same holds for malware analysis in a sandbox, for red-teaming your own detector, and for building training data: the defender runs the model in the attacker's mode, offline, with many attempts and no per-request cost, and the model is worth exactly as much to him as to the other side.</p>
+
+<p>So the symmetric row is not where the irony lives. It is where the defender should try to be.</p>
+
+<h2>Where it is not</h2>
+
+<p>Every domain in the bottom row has the same three ingredients: a decision the defender cannot defer, a cost for getting it wrong that lands on a legitimate user, and an attacker who tests offline before sending. The numbers below are the ones I could find that measure the gap directly.</p>
+
+<table>
+<thead><tr><th>Domain</th><th>What the attacker's model does, offline</th><th>What the defender's model has to do, inline</th><th>Measured gap</th></tr></thead>
+<tbody>
+<tr><td>Payload inspection (SQLi, XSS, command injection)</td><td>Generates obfuscated variants and keeps the ones that pass</td><td>Classify every request within a microsecond budget</td><td>GPT-4o XSS variants bypassed ModSecurity at 80%, AWS WAF near 100% (<a href="https://arxiv.org/html/2504.08176">GenXSS</a>); detectors of every family fell from ~98% to 60% on LLM-generated SQLi (<a href="https://doaj.org/article/e56b50b82df44cfc9feb6eddfd1d4567">IEEE Access, Jan 2026</a>); the cheapest transformer costs 14.7 ms against a 275 µs pipeline (<a href="https://arxiv.org/html/2512.23610v2">WAMM</a>, <a href="https://blog.cloudflare.com/making-waf-ai-models-go-brr/">Cloudflare</a>)</td></tr>
+<tr><td>Bot and agent traffic</td><td>Browses like a person; solver services clear challenges</td><td>Tell an agent from a human before serving the page</td><td>Two LLM agents produced "nearly indistinguishable event traces"; the one in a real browser profile passed reCAPTCHA v3, the other did not; solvers beat challenge CAPTCHAs at $0.10–5 per 1,000 (<a href="https://arxiv.org/html/2607.18659">Broken Gates, Jul 2026</a>)</td></tr>
+<tr><td>Prompt-injection guards</td><td>Crafts injections with the same model the guard is built from</td><td>Screen every input to the application's model</td><td>A guard at 0% false positives on its benchmark ran at 41% on live traffic; the LLM judge behind it took 2–4 s per call (<a href="https://www.prismor.dev/blog/prompt-injection-classifier-in-front-of-llm-judge">Prismor, Sept 2026</a>)</td></tr>
+<tr><td>Alert triage</td><td>Generates volume: variants, retries, noise</td><td>Decide which alert is real, at analyst speed</td><td>LLMs classified about a third of attack-related IDS alerts correctly zero-shot, 75–83.5% with examples, and the authors rejected open models as too weak (<a href="https://link.springer.com/chapter/10.1007/978-3-032-35579-9_19">Springer, Aug 2026</a>)</td></tr>
+</tbody>
+</table>
+
+<p>Two rows have no recent number I could stand behind and are listed on reasoning alone. Phishing: the model writes fluent, personalised lures at zero marginal cost, and the defender's filter must not quarantine real correspondence; "detect model-written text" is not a reliable basis for that filter. Liveness and identity checks: synthetic voice, face and document generation against a verifier that must decide in seconds with a low rejection rate for real customers. Both have the three ingredients; neither has a measurement in the 2025–2026 record that I found.</p>
+
+<p>What the table does not show is as important as what it does. In none of these rows did the attacker's model do anything the defender's model cannot do; in every row the defender was the one who had to answer now, on every input, and be right. The model is not on one side. The clock is.</p>
+
+<h2>The way out of the alley</h2>
+
+<p>If the asymmetry is the clock, the remedy is to move the decision off the clock, and that is a design choice, not a research result. A defender cannot make the model faster than the budget, and the record says the model is not the best inline classifier anyway: on every head-to-head I found, a small fine-tuned encoder beat a prompted decoder on both accuracy and cost (an 8B classifier matched DistilBERT at 42× the cost on SQLi and XSS; a fine-tuned DeBERTa reached 95–99% F1 at 12.4 ms on log sequences where a local LLaMA-3-8B needed 156 ms). But a defender can restructure the problem so that most of the judgement happens in the top row.</p>
+
+<p>That is what the two earlier articles amount to. <a href="next-gen-waf.html">The first</a> established the budget and the ranking: rules and a fast classifier on every request, an encoder on the escalated tail, and the generative model only in the offline loop that writes rules, generates red-team payloads and filters training data. <a href="next-gen-waf-what-can-be-done.html">The second</a> proposed three places the local model can sit once it is off the request path, all of them deciding seconds later and acting on an identity rather than on a request: post-processing the escalated payload in context, learning per-endpoint profiles from legitimate traffic, and reading session flows for the abuse that lives in the sequence rather than in any payload. In each one the model does the attacker's kind of work (many attempts, offline, no per-request cost) on the defender's own data, which is the one advantage the attacker does not have.</p>
+
+<p>The irony, then, is real but narrower than it looks. The attacker got the model first because his job was already shaped like what the model is good at. The defender's job was not, and until it is reshaped the model stays on the wrong side of the wire. Reshaping it is the work; the model has been ready for a while.</p>
+
+<h2>Sources</h2>
+
+<p>All opened and read on 27 September 2026. Figures quoted from the two earlier articles are sourced there.</p>
+
+<table>
+<thead><tr><th>Date</th><th>Source</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>20 Sept 2026</td><td><a href="https://www.prismor.dev/blog/prompt-injection-classifier-in-front-of-llm-judge">Prismor: a classifier in front of the LLM judge</a></td><td>0% benchmark vs 41% live FPR; LLM judge 2–4 s</td></tr>
+<tr><td>18 Aug 2026</td><td><a href="https://link.springer.com/chapter/10.1007/978-3-032-35579-9_19">Let the Alerts Speak: LLM-Based IDS Alert Interpretation for SOC Triage</a></td><td>Zero- and few-shot triage accuracy</td></tr>
+<tr><td>21 Jul 2026</td><td><a href="https://arxiv.org/html/2607.18659">Broken Gates: Re-evaluating Web Bot Defenses in the Age of LLM Agents, arXiv 2607.18659</a></td><td>Agent traces vs environment; solver costs</td></tr>
+<tr><td>19 Jun 2026</td><td><a href="https://arxiv.org/html/2606.21397v1">Evaluating LLMs for Real-World Web Vulnerability Detection, arXiv 2606.21397</a></td><td>63% / 48% detection in 32 GPU-hours</td></tr>
+<tr><td>14 Apr 2026</td><td><a href="https://arxiv.org/html/2604.12218v1">LLM-Enhanced Log Anomaly Detection: A Comprehensive Benchmark, arXiv 2604.12218</a></td><td>DeBERTa 12.4 ms vs LLaMA-3-8B 156 ms</td></tr>
+<tr><td>Jan 2026</td><td><a href="https://doaj.org/article/e56b50b82df44cfc9feb6eddfd1d4567">SQL Injection in LLM-Generated Queries, IEEE Access</a></td><td>98% → 60% detector collapse</td></tr>
+<tr><td>Dec 2025</td><td><a href="https://arxiv.org/html/2512.23610v2">WAMM: Enhanced Web Payload Classification, arXiv 2512.23610</a></td><td>14.7 ms DistilBERT on CPU</td></tr>
+<tr><td>2025</td><td><a href="https://arxiv.org/html/2504.08176">GenXSS, arXiv 2504.08176</a></td><td>80% / ~100% bypass from generated XSS</td></tr>
+<tr><td>2025</td><td><a href="https://di0zxmb8pwajl.cloudfront.net/kics/conference/icaiic2025/presentation/1571099636.pdf">Fine-Tuning Transformer LLMs for Detecting SQLi and XSS, ICAIIC 2025</a></td><td>8B classifier at 42× DistilBERT's cost</td></tr>
+<tr><td>25 Jul 2024</td><td><a href="https://blog.cloudflare.com/making-waf-ai-models-go-brr/">Cloudflare: Making WAF ML models go brrr</a></td><td>275 µs production budget</td></tr>
+</tbody>
+</table>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>
