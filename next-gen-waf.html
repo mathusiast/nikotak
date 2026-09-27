@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Next-Gen WAF: What the Evidence Supports — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+<style>
+figure{margin:1.5rem 0}
+figure svg{width:100%;height:auto;display:block;font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif}
+figcaption{font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;color:var(--muted);font-size:.8rem;margin-top:.5rem}
+</style>
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>Next-Gen WAF: What the Evidence Supports</h1>
+<p class="date"><time datetime="2026-09-27">27 September 2026</time></p>
+
+<p>I spent years on the data side of a WAF, and the question I keep getting asked now is whether a local language model can sit in the request path and judge SQL, XSS and shell injection payloads. This post is the answer as far as the published record supports it, as of late September 2026. It has three parts: what has actually been measured, what those measurements force on an architecture, and the experiments I would run next.</p>
+
+<p>One rule governs the whole text. Every number is taken from a dated source that I opened and read, and is linked where it appears. Where the literature is silent, I say so instead of filling the gap. Several of the most useful figures come from adjacent problems (prompt-injection guards, network-flow classification) rather than from HTTP payload inspection itself; each of those is labelled as a proxy, not as evidence about WAF traffic.</p>
+
+<p>The short version: no 2025–2026 study I could find measures a generative local LLM (Llama, Qwen, Gemma, Phi) classifying SQLi/XSS/CMDi payloads inline with a per-request latency figure. The papers that do report timing on this exact task use encoders or classical ML, and every one of them concludes the transformer is the bottleneck.</p>
+
+<h2 id="part-1">Part 1: what has been measured</h2>
+
+<h3>The latency budget a WAF actually has</h3>
+
+<p>The only production number in the public record is Cloudflare's, and it is measured in microseconds, not milliseconds. In July 2024 Cloudflare reported that its WAF Attack Score model (HTTP normalisation, n-gram tokenisation, TensorFlow Lite inference, covering SQLi, XSS and RCE) ran at 1,519 µs per request end to end before optimisation and 275 µs after, a 5.5× speed-up, on x86-64 CPUs with AVX2 and no GPU. The preprocessing was rewritten in Rust; inference moved to TFLite 2.16.1 with XNNPACK, which alone cut model time by 77.17%. A cache in front of the model hit roughly 70% of the time (<a href="https://blog.cloudflare.com/making-waf-ai-models-go-brr/">Cloudflare, 25 Jul 2024</a>). That is the bar for "inline at scale": a few hundred microseconds on a CPU core, at what the post describes as tens of millions of requests per second across the fleet.</p>
+
+<p>The practitioner thresholds quoted for inline model checks are looser but come from the LLM-guardrail world, not from WAFs. A June 2026 write-up on running six guardrail tools inline states that "anything over about 50ms inline and users feel it; over about 200ms and someone disables it", and offers no measured latencies per tool (<a href="https://dev.to/james_oconnor_dev/i-put-6-llm-guardrail-tools-inline-and-measured-what-they-cost-me-here-is-the-latency-vs-recall-433g">dev.to, Jun 2026</a>). I treat the 50 ms / 200 ms figures as opinion, not measurement.</p>
+
+<p>So the budget has two very different readings depending on who is asked: sub-millisecond if you are a CDN-scale WAF vendor on CPU, tens of milliseconds if you are guarding a chat endpoint that already spends seconds generating a reply. Everything that follows has to be read against the first number, because that is the traffic profile a WAF sees.</p>
+
+<h3>What the payload-classification papers measured</h3>
+
+<p>Three recent papers report both accuracy and timing on SQLi/XSS-class payloads, and the timing gap between classical ML and a transformer is two to three orders of magnitude in each.</p>
+
+<table>
+<thead><tr><th>Model</th><th>Measured speed</th><th>Accuracy</th><th>Hardware</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>XGBoost on TF-IDF + engineered features</td><td>0.049 ms per sample</td><td>99.59% acc, 86.07% macro-F1 (7 classes)</td><td>8 vCPU, 32 GB CPU server</td><td><a href="https://arxiv.org/html/2512.23610v2">WAMM, Dec 2025</a></td></tr>
+<tr><td>BiLSTM (char-level)</td><td>0.712 ms</td><td>97.56% acc, 59.85% macro-F1</td><td>same</td><td>WAMM</td></tr>
+<tr><td>CNN-BiLSTM</td><td>0.748 ms</td><td>97.42% acc, 57.61% macro-F1</td><td>same</td><td>WAMM</td></tr>
+<tr><td>DistilBERT, 128 tokens</td><td>14.701 ms (140× XGBoost)</td><td>96.64% acc, 59.48% macro-F1</td><td>same CPU</td><td>WAMM</td></tr>
+<tr><td>DistilBERT embeddings + stacked ensemble (LR, XGBoost, SVM, neural meta-learner)</td><td>full test set in 0.0136 s vs 1.896 s for DistilBERT-SVM (≈140×)</td><td>99.81% (ensemble) vs 99.82% (DistilBERT-SVM)</td><td>not stated in abstract</td><td><a href="https://arxiv.org/abs/2608.28889">arXiv 2608.28889, 28 Aug 2026</a></td></tr>
+<tr><td>DistilBERT (fine-tuned classifier)</td><td>285.4 samples/s</td><td>SQLi &gt;94%, XSS &gt;96%</td><td>Tesla V100 32 GB</td><td><a href="https://di0zxmb8pwajl.cloudfront.net/kics/conference/icaiic2025/presentation/1571099636.pdf">ICAIIC 2025</a></td></tr>
+<tr><td>ALBERT</td><td>195.2 samples/s</td><td>SQLi &gt;81%, XSS &gt;96%</td><td>same</td><td>ICAIIC 2025</td></tr>
+<tr><td>ArmoRM-Llama3-8B with classification head (16,384 trainable params)</td><td>6.8 samples/s</td><td>SQLi &gt;94%, XSS &gt;96%</td><td>same</td><td>ICAIIC 2025</td></tr>
+</tbody>
+</table>
+
+<p>The WAMM figures are the cleanest: same CPU box, same augmented SR-BH 2020 dataset covering SQLi, XSS, LFI, RFI, OS command injection, SSTI and SSRF, and a per-sample inference time for each model. The DistilBERT number, 14.7 ms on CPU, is already 50× over Cloudflare's whole-pipeline budget above, and its macro-F1 is the worst of the four.</p>
+
+<p>Two caveats on the table. The ICAIIC "samples per second" is the throughput printed by a batched evaluation run, so it is an upper bound on per-request rate, not a latency. And the Aug 2026 paper reports elapsed time for the full test set without stating its size in the abstract; the PDF was not machine-readable when I tried it, so the 140× ratio is the only usable figure. Notably, its fast path still depends on DistilBERT embeddings being computed at inference; the abstract does not say whether the 0.0136 s includes that step.</p>
+
+<h3>Accuracy that does not survive contact</h3>
+
+<p>The 99% accuracies in the table above are benchmark-internal, and three recent results show how far they fall outside the benchmark.</p>
+
+<p>First, macro-F1 versus accuracy. In WAMM, XGBoost scores 99.59% accuracy but 86.07% macro-F1, and the three neural models sit at 57–60% macro-F1 despite 96–97% accuracy (<a href="https://arxiv.org/html/2512.23610v2">WAMM</a>, Table VI). The gap is the rare classes: accuracy is dominated by benign traffic and the common attack types, while SSTI and SSRF drag the macro average down. A WAF is judged on exactly those tails.</p>
+
+<p>Second, distribution shift from LLM-generated attacks. An IEEE Access paper from January 2026 tested 14 LLMs with 100 expert-crafted prompts and then ran four detector families (regex, classical ML, a CNN, and a RoBERTa contextual model) on the resulting SQL. Overall detection accuracy "plummeted from roughly 98% on standard SQLi benchmarks to just 60%" on that test set (<a href="https://doaj.org/article/e56b50b82df44cfc9feb6eddfd1d4567">IEEE Access, Jan 2026</a>). The RoBERTa model, the most expensive of the four, did not escape the collapse.</p>
+
+<p>Third, the rule-based baseline is worse than either. On the Drupal dataset, ModSecurity with OWASP CRS v3 reaches 29.55% TPR at 15.57% FPR at paranoia level 1 and 77.89% TPR at 49.93% FPR at level 2; on SR-BH 2020 it detects 26.62% and 28.48% at 0% FPR (<a href="https://arxiv.org/html/2609.26860">arXiv 2609.26860, Sept 2026</a>, Table VIII). The same paper's own FastText + one-class SVM detector, trained on benign traffic only, reaches 80.11% TPR at 0.79% FPR on Drupal and 90.09% at 3.43% on SR-BH 2020, and it reports no timing at all. Its authors dropped contextual embeddings on cost grounds, citing "high computational costs and increased processing times" in near-real-time settings.</p>
+
+<p>The pattern across the three: the cheap models win on in-distribution benchmarks, every model family loses on adversarially generated payloads, and no paper yet shows a transformer buying back enough generalisation to justify its 100–140× latency cost on this task.</p>
+
+<h3>Generative local LLMs: what has been measured, and what has not</h3>
+
+<p>No paper in the 2025–2026 record puts a generative local LLM in front of HTTP payloads and reports per-request latency. What exists is three proxies, each one step removed from the WAF problem.</p>
+
+<p>The closest is the ICAIIC 2025 result already in the table above: an 8B Llama-3 derivative with a classification head runs at 6.8 samples/s on a V100 against 285 samples/s for DistilBERT on the same data, a 42× gap, with no accuracy gain on SQLi or XSS (<a href="https://di0zxmb8pwajl.cloudfront.net/kics/conference/icaiic2025/presentation/1571099636.pdf">ICAIIC 2025</a>). That is a fine-tuned discriminative use of a decoder, not prompting.</p>
+
+<p>The second proxy is network-flow classification. A January 2026 study fine-tuned GPT-2, GPT-Neo-125M and LLaMA-3.2-1B on Zeek flow records from CIC IoT 2023 and measured 104–105 flows/s for the 1B model and up to 517 flows/s for GPT-Neo-125M, against 1.5 million flows/s for XGBoost and 6.25 million for a decision tree, on an Intel Xeon Silver 4210 with an RTX 2060 6 GB. The authors write that "LLMs are 10,000 times slower than ML models" and place them in "applications that process only tens to hundreds of flows per second" (<a href="https://link.springer.com/article/10.1007/s10462-025-11432-2">AIRE, 9 Jan 2026</a>). Flow records are structured, not free-text payloads, so this is a lower bound on the work an HTTP body would demand.</p>
+
+<p>The third proxy is the prompt-injection guard literature, which has the same shape as payload inspection (short adversarial string in, binary label out) and is where the latency numbers are densest. Meta's Prompt Guard 2 encoders run at 19.3 ms (22M, DeBERTa-xsmall) and 92.4 ms (86M, mDeBERTa-base) for 512 tokens on an A100 (<a href="https://huggingface.co/meta-llama/Llama-Prompt-Guard-2-86M">model card</a>). Qualifire's Sentinel, a 395M ModernBERT-large, reports about 20 ms per inference on an L4 (<a href="https://arxiv.org/pdf/2506.05446">arXiv 2506.05446</a>). An August 2026 comparison cites roughly 9.5 ms per item for an encoder on commodity CPU, under 4 ms batched, and lists the LLM-as-judge alternatives (Llama Guard 3, ShieldGemma 2B, Qwen3-Guard 0.6B/4B/8B) without latency figures (<a href="https://www.armosec.io/blog/prompt-injection-detection-models/">ARMO, 20 Aug 2026</a>). The one head-to-head timing I found is from September 2026: a classifier judged a 12,000-character document in 1.1 s median (1.4 s p95) where the LLM judge needed 11.4 s, and the same LLM judge ran 2.07 s to over 4 s on shorter inputs (<a href="https://www.prismor.dev/blog/prompt-injection-classifier-in-front-of-llm-judge">Prismor, 20 Sept 2026</a>). The same post reports the classifier's false-positive rate at 0% on its benchmark and 41% on real traffic, which is the generalisation problem from the previous section again.</p>
+
+<p>One more data point on small generative models as detectors, from a different input type. A WebShell paper prompted Qwen-2.5 at 0.5B, 1.5B and 3B, Qwen-2.5-Coder at 3B and 14B, LLaMA-3.1-70B and GPT-4 on 26.59K PHP files. Without scaffolding the best open model (Qwen-2.5-Coder 14B) reached 96.39% F1, below a graph-attention baseline at 98.87%; with the authors' behavioural-function framework the 0.5B model gained +51.23 F1 points. No latency is reported (<a href="https://arxiv.org/html/2504.13811v5">arXiv 2504.13811</a>). The result cuts both ways: prompting a sub-1B model naively fails, and the fix that rescues it is engineering around the model, not the model.</p>
+
+<p>What is missing from the record is the experiment that matters: a 0.5B–3B decoder used as a single-forward-pass classifier (logits over a yes/no token, no generation) on SR-BH or CSIC payloads, with p50/p99 per request on a consumer GPU and on CPU. That absence is the first item in <a href="#part-3">Part 3</a>.</p>
+
+<h3>The attacker already has the LLM</h3>
+
+<p>The measured impact of LLMs on the WAF problem so far is on the offensive side, and the numbers are large. GenXSS used GPT-4o and Gemini Pro to generate obfuscated XSS payloads by in-context learning: 220 of GPT-4o's 264 payloads (83%) were valid, and of those 80% bypassed ModSecurity and nearly 100% bypassed AWS WAF; Gemini Pro's valid payloads bypassed ModSecurity at 74% (<a href="https://arxiv.org/html/2504.08176">GenXSS, arXiv 2504.08176</a>). The same paper then clustered the successful attacks and had the LLM write rules from the clusters, blocking 86% of the previously successful payloads with an F1 of 0.9259 for the generated rule set. Latency is not reported for either direction, and the rule-writing step is offline by construction.</p>
+
+<p>The defensive corollary is in the training data. A WiseML 2025 paper fine-tuned CodeT5-small to produce obfuscated variants of XSS samples: a Random Forest trained on the original data fell to 0.523 recall under obfuscation, and retraining on the LLM-generated variants brought it back to 0.995 accuracy and 0.993 F1 (<a href="https://arxiv.org/html/2504.21045v1">arXiv 2504.21045</a>). An MDPI study built its SQLi corpus by generating 72,304 malicious queries with GPT-4o against 17,695 legitimate ones and reached 96.86% accuracy with a voting ensemble of XGBoost and LightGBM (<a href="https://www.mdpi.com/2079-9292/14/17/3420">Electronics, Sept 2025</a>). WAMM's best dataset variant is the one where an LLM filtered noisy synthetic payloads out of the augmented set (<a href="https://arxiv.org/html/2512.23610v2">WAMM</a>).</p>
+
+<p>Read together with the 98%→60% collapse above on LLM-generated SQLi: the attacker's LLM moves the payload distribution faster than a static training set can follow, and the only published defences that recover are the ones that put an LLM in the data-generation loop, offline, and keep the cheap classifier inline.</p>
+
+
+<h2 id="part-2">Part 2: what the numbers force</h2>
+
+
+<p><a href="#part-1">Part 1</a> collected the measured numbers: a production WAF pipeline at 275 µs per request on CPU, XGBoost at 49 µs per payload, DistilBERT at 14.7 ms, an 8B model 42× slower than DistilBERT for no accuracy gain, and every detector family collapsing from 98% to 60% on LLM-generated SQLi. This part is what those numbers force on an architecture.</p>
+
+<h3>A tiered pipeline, and where each model class can sit</h3>
+
+<p>The latency ladder in Part 1 spans five orders of magnitude, from 49 µs for XGBoost to seconds for an LLM judge, and no single model covers it. The architecture the evidence supports is a cascade: a cheap model on every request, an expensive one on the fraction it cannot decide, and the generative model outside the request path altogether.</p>
+
+<figure>
+<svg viewBox="0 0 760 340" role="img" aria-label="The measured latencies only fit a tiered pipeline with the LLM offline" font-size="11.5">
+<defs><marker id="tier-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path style="fill:var(--muted)" d="M0 0L10 5L0 10z"/></marker></defs>
+<text style="fill:var(--fg)" x="24" y="28" font-size="15" font-weight="600">The measured latencies only fit a tiered pipeline with the LLM offline</text>
+<g style="stroke:var(--muted)" fill="none" stroke-width="1.25">
+<path d="M240 108H260" marker-end="url(#tier-arrow)"/>
+<path d="M476 108H496" marker-end="url(#tier-arrow)"/>
+<path d="M672 152V224" marker-end="url(#tier-arrow)"/>
+<path d="M64 224V152" marker-end="url(#tier-arrow)"/>
+<path d="M300 224V152" marker-end="url(#tier-arrow)"/>
+</g>
+<text style="fill:var(--muted)" x="258" y="56" text-anchor="middle">uncertain: escalate</text>
+<text style="fill:var(--muted)" x="494" y="56" text-anchor="middle">uncertain: escalate</text>
+<g>
+<rect style="stroke:var(--muted)" x="24" y="64" width="216" height="88" rx="8" fill="none" stroke-width="1.25"/>
+<text style="fill:var(--fg)" x="36" y="88" font-size="13" font-weight="600">Tier 0: rules + verdict cache</text>
+<text style="fill:var(--fg)" x="36" y="108">OWASP CRS PL1: 29.55% TPR</text>
+<text style="fill:var(--fg)" x="36" y="124">at 15.57% FPR (Drupal set)</text>
+<text style="fill:var(--muted)" x="36" y="140">cache hit about 70% (Cloudflare)</text>
+</g>
+<g>
+<rect style="fill:var(--link);stroke:var(--link)" x="260" y="64" width="216" height="88" rx="8" fill-opacity="0.12" stroke-width="2"/>
+<text style="fill:var(--fg)" x="272" y="88" font-size="13" font-weight="600">Tier 1: fast ML, every request</text>
+<text style="fill:var(--fg)" x="272" y="108">TF-IDF/n-gram + XGBoost</text>
+<text style="fill:var(--fg)" x="272" y="124">0.049 ms per sample on CPU</text>
+<text style="fill:var(--muted)" x="272" y="140">prod pipeline 275 µs (Cloudflare)</text>
+</g>
+<g>
+<rect style="stroke:var(--muted)" x="496" y="64" width="216" height="88" rx="8" fill="none" stroke-width="1.25"/>
+<text style="fill:var(--fg)" x="508" y="88" font-size="13" font-weight="600">Tier 2: encoder, the tail only</text>
+<text style="fill:var(--fg)" x="508" y="108">DistilBERT 14.7 ms on CPU</text>
+<text style="fill:var(--fg)" x="508" y="124">22M DeBERTa 19.3 ms on A100</text>
+<text style="fill:var(--muted)" x="508" y="140">runs only on escalated requests</text>
+</g>
+<text style="fill:var(--muted)" x="682" y="196">misses, logs</text>
+<text style="fill:var(--muted)" x="74" y="196">new rules</text>
+<text style="fill:var(--muted)" x="310" y="196">retrained models</text>
+<g>
+<rect style="fill:var(--code);stroke:var(--muted)" x="24" y="224" width="688" height="88" rx="8" stroke-width="1.25"/>
+<text style="fill:var(--fg)" x="36" y="248" font-size="13" font-weight="600">Offline loop: generative LLM, seconds per item, never in the request path</text>
+<text style="fill:var(--fg)" x="36" y="268">generates evasions: GPT-4o XSS payloads bypassed ModSecurity 80% (GenXSS)</text>
+<text style="fill:var(--fg)" x="36" y="284">filters and augments training data (WAMM LLM filtering, CodeT5 obfuscation)</text>
+<text style="fill:var(--fg)" x="36" y="300">writes rules from clustered misses: 86% of prior bypasses blocked, F1 0.9259</text>
+</g>
+</svg>
+<figcaption>Tiered pipeline: three inline tiers, one offline loop. Every figure is from Part 1.</figcaption>
+</figure>
+
+<p>Each tier's figure is the one measured in Part 1; the escalation thresholds and the fraction of traffic that reaches Tier 2 are not in any source and are the subject of <a href="#part-3">Part 3</a>, experiment 4. The Tier 0 cache figure is Cloudflare's ~70% hit ratio on its ML pipeline; whether a verdict cache holds at that rate on a different traffic mix is not established.</p>
+
+<p>Two consequences follow. Tier 2's cost is only bearable if Tier 1 escalates a small fraction: at 14.7 ms per escalated request on CPU (WAMM's DistilBERT), escalating 5% of traffic adds 0.74 ms of mean latency, escalating 50% adds 7.4 ms, and the p99 is Tier 2's full latency either way. And the generative LLM's only measured contributions (<a href="#part-1">Part 1</a>, last section) are all batch jobs: payload generation, data filtering, rule synthesis. Nothing in the record shows it earning its seconds-per-item cost inline.</p>
+
+<h3>Where the LLM earns its cost</h3>
+
+<p>The generative model has three measured uses in this literature, and all three run offline against a corpus, not inline against a request.</p>
+
+<p>The first is red-teaming the deployed detector. GenXSS's numbers (80% ModSecurity bypass from GPT-4o-generated XSS, near-100% on AWS WAF) are the only quantified evasion rates in the recent record, and they were obtained with API models, not local ones (<a href="https://arxiv.org/html/2504.08176">GenXSS</a>). A local model in the same role has no published bypass rate; whether a 7B–14B open model generates evasions of comparable validity is an open question, and experiment 5 in <a href="#part-3">Part 3</a> is built around it.</p>
+
+<p>The second is training-set construction. Three papers in the last section of Part 1 use a generative model to write, mutate or filter payloads and then train a cheap classifier on the result: CodeT5-small obfuscation lifting Random Forest from 0.523 to 0.995 under obfuscation (<a href="https://arxiv.org/html/2504.21045v1">arXiv 2504.21045</a>), GPT-4o generating 72,304 SQLi samples (<a href="https://www.mdpi.com/2079-9292/14/17/3420">Electronics, Sept 2025</a>), and WAMM's LLM-filtered augmentation producing its best dataset variant (<a href="https://arxiv.org/html/2512.23610v2">WAMM</a>). This is the one use where the model's cost is amortised over every future request, because the inline model is unchanged.</p>
+
+<p>The third is rule synthesis from clustered misses: GenXSS's generated rules blocked 86% of previously successful payloads at F1 0.9259. This keeps Tier 0 in the loop rather than replacing it, which matters because Tier 0 is where the 0% FPR lives (SR-BH 2020, CRS PL1/PL2, <a href="https://arxiv.org/html/2609.26860">arXiv 2609.26860</a> Table VIII).</p>
+
+<p>What none of the three does is put the LLM's judgement on a live request. The Prismor timing in Part 1, 2.07 s to over 4 s per LLM-judge call, is four orders of magnitude over Cloudflare's 275 µs. Even the encoder tier is 50× over that budget on CPU. The design question is therefore not "which LLM inline" but "how small can the inline model be while the LLM keeps its training data current".</p>
+
+<h3>Contradictions in the evidence</h3>
+
+<p>The sources do not agree with each other on four points, and the disagreements are informative.</p>
+
+<p>DistilBERT is the worst model in WAMM (59.48% macro-F1, below XGBoost's 86.07%) and the best single model in the Aug 2026 SQLi paper (99.82% as DistilBERT-SVM). The two are not measuring the same thing: WAMM is a 7-class problem on honeypot traffic with rare classes, the Aug 2026 paper is binary SQLi. The reconciliation the second paper itself offers is to use DistilBERT as a frozen feature extractor and put a classical ensemble on top, which is what recovers the 140× speed-up. Read together: the encoder's value is in its embedding, not its classification head, and the rare-class problem is unsolved by either.</p>
+
+<p>Rule-based WAFs have 0% FPR on SR-BH 2020 and 15.57–49.93% FPR on Drupal (<a href="https://arxiv.org/html/2609.26860">arXiv 2609.26860</a> Table VIII). Same rule set, same paranoia levels. The FPR of CRS is a property of the protected application's benign traffic, not of the rules, so any FPR figure for a WAF that does not name the application is not a figure.</p>
+
+<p>The 8B model in ICAIIC 2025 matches DistilBERT on accuracy and is 42× slower; the AIRE 2026 study finds LLaMA-3.2-1B at 104 flows/s against XGBoost's 1.5 M/s with no accuracy advantage reported for the LLM on the binary task. Against those, the WebShell paper reports a sub-1B Qwen jumping +51 F1 points with the right scaffolding (<a href="https://arxiv.org/html/2504.13811v5">arXiv 2504.13811</a>). The scaffolding there is file-level behavioural analysis, which has no equivalent for a single HTTP request; I do not read the WebShell result as evidence for inline payload inspection.</p>
+
+<p>The IEEE Access 60% figure and the WAMM 99.59% figure describe the same model family (classical ML on SQLi) a few months apart. The difference is the test set: WAMM's is drawn from the same distribution as training, IEEE Access's is LLM-generated. Neither is wrong. A next-gen WAF has to report both numbers, and the second one is the one that predicts production.</p>
+
+
+<h2 id="part-3">Part 3: experiments</h2>
+
+
+<p>Six experiments, each aimed at a gap Part 1 left open, each with the published number it has to beat. Datasets are the ones the cited papers used, so results are comparable: SR-BH 2020 (real honeypot traffic, 12 attack categories), CSIC 2010 (synthetic), and the Drupal set from <a href="https://arxiv.org/html/2609.26860">arXiv 2609.26860</a>.</p>
+
+<table>
+<thead><tr><th>#</th><th>Question</th><th>Design</th><th>Metric</th><th>Number to beat</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Can a sub-1B decoder classify a payload in one forward pass fast enough to be a Tier 2?</td><td>Qwen3-0.6B, Llama-3.2-1B: logit over a yes/no token, no generation, prefill only; batch 1 and batch 32; consumer GPU and CPU; SR-BH payloads at 128 tokens</td><td>p50/p99 ms per request, macro-F1</td><td>14.7 ms (DistilBERT, CPU, WAMM); 104 samples/s (LLaMA-3.2-1B, AIRE); 42× slowdown vs DistilBERT (ICAIIC)</td></tr>
+<tr><td>2</td><td>Does a 22M–86M DeBERTa fine-tuned on payloads hold the encoder's F1 at a fraction of its cost?</td><td>Prompt-Guard-2-size encoders (DeBERTa-xsmall, mDeBERTa-base) fine-tuned on WAMM's DS-Augmented-v2; ONNX int8 on CPU</td><td>ms per request, macro-F1 on 7 classes</td><td>19.3 ms at 512 tokens on A100 (Prompt Guard 2 22M); 59.48% macro-F1 (DistilBERT, WAMM)</td></tr>
+<tr><td>3</td><td>How much of the 98%→60% collapse can offline LLM augmentation recover?</td><td>Train Tier 1 (XGBoost) on SR-BH; test on LLM-generated SQLi/XSS from a local 7B–14B model; retrain with the generated set held out by generator</td><td>accuracy and F1 on the held-out generator</td><td>60% (IEEE Access, Jan 2026); 0.523→0.995 recovery (CodeT5 obfuscation)</td></tr>
+<tr><td>4</td><td>What escalation rate does a cascade produce, and what is the resulting p99?</td><td>Tier 1 XGBoost with a calibrated uncertainty band; Tier 2 = the winner of experiments 1–2; replay SR-BH and Drupal traffic</td><td>escalation fraction, mean and p99 latency, F1 vs Tier 1 alone</td><td>275 µs pipeline and ~70% cache hit (Cloudflare)</td></tr>
+<tr><td>5</td><td>Can a local model red-team the WAF at the rate an API model does?</td><td>Local 7B–14B model generating XSS/SQLi by in-context learning as in GenXSS; validate on a vulnerable target; measure bypass on CRS PL1/PL2</td><td>payload validity rate, bypass rate</td><td>83% valid, 80% ModSecurity bypass (GPT-4o, GenXSS)</td></tr>
+<tr><td>6</td><td>Does LLM-written rule synthesis reduce Tier 0's FPR on a real application, or only its misses?</td><td>Cluster experiment 5's bypasses; LLM writes CRS-style rules; evaluate on Drupal benign traffic</td><td>TPR and FPR on Drupal</td><td>29.55% TPR / 15.57% FPR at PL1; 86% of bypasses blocked, F1 0.9259 (GenXSS)</td></tr>
+</tbody>
+</table>
+
+<p>Three notes on running them. Every model in experiments 1, 2 and 4 must be timed at batch size 1 as well as batched, because every published throughput figure for the transformers (285 samples/s, 6.8 samples/s, 104 flows/s) comes from batched evaluation and a WAF sees one request at a time. Every accuracy figure must be reported twice, on the in-distribution test set and on the LLM-generated one, or it repeats the mistake Part 1 documents. And macro-F1 over all classes is the headline metric, not accuracy, because accuracy is where the 99% numbers come from and macro-F1 is where they go to die.</p>
+
+<p>If experiment 1 fails, and the proxies say it will on CPU, the next-gen WAF is a cascade of classical ML and a small encoder with a local LLM feeding it data, and Part 2 already describes it. If it succeeds on a GPU at batch 1 under 5 ms, a decoder becomes a candidate Tier 2 and the question moves to experiment 4.</p>
+
+<h3>Sources</h3>
+
+<p>All opened and read on 27 September 2026. Two could not be read in full: the PDF of arXiv 2608.28889 (not machine-readable; only its abstract is used) and the LLM-AE-MP paper (abstract only, paywalled).</p>
+
+<table>
+<thead><tr><th>Date</th><th>Source</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>20 Sept 2026</td><td><a href="https://www.prismor.dev/blog/prompt-injection-classifier-in-front-of-llm-judge">Prismor: a classifier in front of the LLM judge</a></td><td>LLM-judge vs classifier latency; 0% vs 41% FPR</td></tr>
+<tr><td>Sept 2026</td><td><a href="https://arxiv.org/html/2609.26860">Comparative Evaluation of Static Embedding Models for HTTP Request Anomaly Detection, arXiv 2609.26860</a></td><td>CRS baselines, FastText+OCSVM, datasets</td></tr>
+<tr><td>28 Aug 2026</td><td><a href="https://arxiv.org/abs/2608.28889">Enhancing WAFs with ML for SQLi Detection, arXiv 2608.28889</a></td><td>DistilBERT ensemble, 140× speed-up</td></tr>
+<tr><td>20 Aug 2026</td><td><a href="https://www.armosec.io/blog/prompt-injection-detection-models/">ARMO: prompt injection detection models</a></td><td>Guard-model landscape, CPU encoder timing</td></tr>
+<tr><td>Jun 2026</td><td><a href="https://dev.to/james_oconnor_dev/i-put-6-llm-guardrail-tools-inline-and-measured-what-they-cost-me-here-is-the-latency-vs-recall-433g">dev.to: six guardrail tools inline</a></td><td>50 ms / 200 ms practitioner thresholds (opinion)</td></tr>
+<tr><td>Jan 2026</td><td><a href="https://doaj.org/article/e56b50b82df44cfc9feb6eddfd1d4567">SQL Injection in LLM-Generated Queries, IEEE Access</a></td><td>98%→60% detector collapse</td></tr>
+<tr><td>9 Jan 2026</td><td><a href="https://link.springer.com/article/10.1007/s10462-025-11432-2">Evaluating LLMs for flow-based intrusion detection, AIRE</a></td><td>LLaMA-3.2-1B vs XGBoost throughput</td></tr>
+<tr><td>Dec 2025</td><td><a href="https://arxiv.org/html/2512.23610v2">WAMM: Enhanced Web Payload Classification, arXiv 2512.23610</a></td><td>Per-model inference time and macro-F1 on SR-BH</td></tr>
+<tr><td>Sept 2025</td><td><a href="https://www.mdpi.com/2079-9292/14/17/3420">Machine Learning Models for SQL Injection Detection, Electronics</a></td><td>GPT-4o-generated SQLi corpus</td></tr>
+<tr><td>May 2025</td><td><a href="https://www.sciencedirect.com/science/article/abs/pii/S0957417425006049">LLM-AE-MP, Expert Systems with Applications</a></td><td>CSIC/FWAF/HttpParams results (abstract)</td></tr>
+<tr><td>2025</td><td><a href="https://arxiv.org/html/2504.21045v1">Leveraging LLM to Strengthen ML-Based XSS Detection, arXiv 2504.21045</a></td><td>CodeT5 obfuscation augmentation</td></tr>
+<tr><td>2025</td><td><a href="https://arxiv.org/html/2504.08176">GenXSS, arXiv 2504.08176</a></td><td>LLM-generated XSS bypass rates, rule synthesis</td></tr>
+<tr><td>2025</td><td><a href="https://arxiv.org/html/2504.13811v5">Can LLMs Handle WebShell Detection?, arXiv 2504.13811</a></td><td>Small Qwen models as detectors (file-based)</td></tr>
+<tr><td>2025</td><td><a href="https://di0zxmb8pwajl.cloudfront.net/kics/conference/icaiic2025/presentation/1571099636.pdf">Fine-Tuning Transformer LLMs for Detecting SQLi and XSS, ICAIIC 2025</a></td><td>DistilBERT / ALBERT / 8B throughput on V100</td></tr>
+<tr><td>2025</td><td><a href="https://arxiv.org/pdf/2506.05446">Sentinel, arXiv 2506.05446</a></td><td>ModernBERT-large latency on L4</td></tr>
+<tr><td>2025</td><td><a href="https://huggingface.co/meta-llama/Llama-Prompt-Guard-2-86M">Llama Prompt Guard 2 model card</a></td><td>22M / 86M encoder latency on A100</td></tr>
+<tr><td>25 Jul 2024</td><td><a href="https://blog.cloudflare.com/making-waf-ai-models-go-brr/">Cloudflare: Making WAF ML models go brrr</a></td><td>Production per-request budget, cache hit ratio</td></tr>
+</tbody>
+</table>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>
