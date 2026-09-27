@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Next-Gen WAF: What Can Be Done — NikoTak</title>
+<link rel="stylesheet" href="style.css">
+<style>
+figure{margin:1.5rem 0}
+figure svg{width:100%;height:auto;display:block;font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif}
+figcaption{font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;color:var(--muted);font-size:.8rem;margin-top:.5rem}
+</style>
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>Next-Gen WAF: What Can Be Done</h1>
+<p class="date"><time datetime="2026-09-27">27 September 2026</time></p>
+
+<p><a href="next-gen-waf.html">The first article</a> closed the request path to language models: the production budget is 275 µs on CPU, an encoder costs 14.7 ms, a generative model costs seconds. This article proposes three places a local model can sit instead, all of them off the request path, all of them deciding seconds later, and all of them acting on an identity (an API key, a user, a session, a source) rather than on a request that has already been answered. Nothing here calls out to a remote service; the premise is that a WAF's traffic does not leave the box.</p>
+
+<p>The three paths: (A) post-process the payloads the inline tier escalates, in context, and decide whether the identity behind them is blocked; (B) learn per-endpoint profiles from legitimate traffic, so that the inline tier has a positive model to enforce and Path A has a definition of "unexpected"; (C) read session flows, the sequence of endpoints an identity walks through, for brute force, enumeration and scraping, which are identity-level behaviours in the first place.</p>
+
+<p>Each path gets the same treatment: the proposal, the evidence that supports its shape, the measurement that is still missing, and the enforcement hook. Every number comes from a dated source I opened, linked where it appears. Two sources carry most of the weight: <a href="https://arxiv.org/html/2609.06840">WAPP</a> (arXiv, Sept 2026), the only study that learned positive-security policies from live traffic and compared a statistical synthesiser against a local 27B model, and an <a href="https://arxiv.org/html/2604.12218v1">April 2026 benchmark</a> of LLMs against fine-tuned transformers on log-sequence anomaly detection, the closest measured analogue to session-flow analysis.</p>
+
+<h2>The shared shape</h2>
+
+<figure>
+<svg viewBox="0 0 760 350" role="img" aria-label="The model decides seconds later and acts on identities, never on the request" font-size="11.5">
+<defs><marker id="lane-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker></defs>
+<text x="24" y="28" font-size="15" font-weight="600" style="fill:var(--fg)">The model decides seconds later and acts on identities, never on the request</text>
+<text x="24" y="58" style="fill:var(--muted)">Request path, microseconds</text>
+<text x="24" y="186" style="fill:var(--muted)">Analysis lane, seconds later, local</text>
+<g fill="none" stroke-width="1.25" style="stroke:var(--muted)">
+<path d="M320 104H356" marker-end="url(#lane-arrow)"/>
+<path d="M114 140V196" marker-end="url(#lane-arrow)"/>
+<path d="M204 240H240" marker-end="url(#lane-arrow)"/>
+<path d="M520 240H556" marker-end="url(#lane-arrow)"/>
+<path d="M380 284V320"/>
+<path d="M646 284V320H60V140" marker-end="url(#lane-arrow)"/>
+</g>
+<g>
+<rect x="24" y="68" width="296" height="72" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="36" y="92" font-size="13" font-weight="600" style="fill:var(--fg)">Inline tiers</text>
+<text x="36" y="112" style="fill:var(--fg)">rules, per-endpoint profiles, fast ML</text>
+<text x="36" y="128" style="fill:var(--muted)">275 µs budget, one verdict per request</text>
+</g>
+<g>
+<rect x="356" y="68" width="140" height="72" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="368" y="92" font-size="13" font-weight="600" style="fill:var(--fg)">Response</text>
+<text x="368" y="112" style="fill:var(--muted)">already served</text>
+</g>
+<text x="122" y="172" style="fill:var(--muted)">escalate</text>
+<g>
+<rect x="24" y="196" width="180" height="88" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="36" y="220" font-size="13" font-weight="600" style="fill:var(--fg)">Escalation queue</text>
+<text x="36" y="240" style="fill:var(--fg)">escalated payloads</text>
+<text x="36" y="256" style="fill:var(--fg)">session flows</text>
+<text x="36" y="272" style="fill:var(--fg)">benign traffic samples</text>
+</g>
+<g>
+<rect x="240" y="196" width="280" height="88" rx="8" fill-opacity="0.12" stroke-width="2" style="fill:var(--link);stroke:var(--link)"/>
+<text x="252" y="220" font-size="13" font-weight="600" style="fill:var(--fg)">Local decoder and small models</text>
+<text x="252" y="240" style="fill:var(--fg)">A: judge escalated payloads in context</text>
+<text x="252" y="256" style="fill:var(--fg)">B: synthesise per-endpoint profiles</text>
+<text x="252" y="272" style="fill:var(--fg)">C: read session flows for abuse</text>
+</g>
+<g>
+<rect x="556" y="196" width="180" height="88" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="568" y="220" font-size="13" font-weight="600" style="fill:var(--fg)">Identity enforcement</text>
+<text x="568" y="240" style="fill:var(--fg)">block API key or user</text>
+<text x="568" y="256" style="fill:var(--fg)">rate-limit session, source</text>
+<text x="568" y="272" style="fill:var(--muted)">reversible, logged</text>
+</g>
+<text x="380" y="338" text-anchor="middle" style="fill:var(--muted)">feed back into the inline tiers: blocklists, profiles, new rules</text>
+</svg>
+<figcaption>Shared shape of the three paths: request path above, analysis lane below.</figcaption>
+</figure>
+
+<p>The request is always served by the inline tiers; the analysis lane receives copies (escalated payloads, session flows, samples of benign traffic), runs the local model on them, and its output is either an identity action or a change to what the inline tiers enforce. The latency of the analysis lane is therefore the delay between an abusive identity's first request and its block, not a delay on any request, and the cost of a wrong verdict is a wrongly blocked identity, which is why every path below ends with the false-positive rate that has to be established before enforcement is turned on.</p>
+
+<h2>Path A: post-process the escalated payload, in context</h2>
+
+<p>The proposal: the inline tier already flags a small fraction of requests it cannot decide. Instead of blocking or passing them on the payload alone, copy them to the analysis lane, where a local model sees what the inline tier structurally cannot: the decoded payload beside the endpoint's expected shape, the response the application actually returned, and what the same identity did before. The decision it returns is about the identity, seconds later.</p>
+
+<figure>
+<svg viewBox="0 0 760 360" role="img" aria-label="Path A judges the payload with the context the inline tier never sees" font-size="11.5">
+<defs><marker id="ctx-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker></defs>
+<text x="24" y="28" font-size="15" font-weight="600" style="fill:var(--fg)">Path A judges the payload with the context the inline tier never sees</text>
+<g fill="none" stroke-width="1.25" style="stroke:var(--muted)">
+<path d="M224 92H252V156H280" marker-end="url(#ctx-arrow)"/>
+<path d="M224 164H252V184H280" marker-end="url(#ctx-arrow)"/>
+<path d="M224 236H252V212H280" marker-end="url(#ctx-arrow)"/>
+<path d="M224 308H252V240H280" marker-end="url(#ctx-arrow)"/>
+<path d="M480 168H508V128H536" marker-end="url(#ctx-arrow)"/>
+<path d="M480 196H508V200H536" marker-end="url(#ctx-arrow)"/>
+<path d="M480 224H508V272H536" marker-end="url(#ctx-arrow)"/>
+</g>
+<g>
+<rect x="24" y="64" width="200" height="56" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="36" y="88" font-size="13" font-weight="600" style="fill:var(--fg)">Payload, decoded</text>
+<text x="36" y="108" style="fill:var(--muted)">escalated by the inline tier</text>
+</g>
+<g>
+<rect x="24" y="136" width="200" height="56" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="36" y="160" font-size="13" font-weight="600" style="fill:var(--fg)">Endpoint profile</text>
+<text x="36" y="180" style="fill:var(--muted)">from Path B: expected fields</text>
+</g>
+<g>
+<rect x="24" y="208" width="200" height="56" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="36" y="232" font-size="13" font-weight="600" style="fill:var(--fg)">Response</text>
+<text x="36" y="252" style="fill:var(--muted)">status, size, timing</text>
+</g>
+<g>
+<rect x="24" y="280" width="200" height="56" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="36" y="304" font-size="13" font-weight="600" style="fill:var(--fg)">Identity history</text>
+<text x="36" y="324" style="fill:var(--muted)">rate, prior flags, account age</text>
+</g>
+<g>
+<rect x="280" y="140" width="200" height="112" rx="8" fill-opacity="0.12" stroke-width="2" style="fill:var(--link);stroke:var(--link)"/>
+<text x="292" y="164" font-size="13" font-weight="600" style="fill:var(--fg)">Local decoder</text>
+<text x="292" y="184" style="fill:var(--fg)">reads all four together</text>
+<text x="292" y="200" style="fill:var(--fg)">few-shot from own incidents</text>
+<text x="292" y="216" style="fill:var(--fg)">seconds, not microseconds</text>
+<text x="292" y="232" style="fill:var(--muted)">never on the request path</text>
+</g>
+<g>
+<rect x="536" y="100" width="200" height="56" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="548" y="124" font-size="13" font-weight="600" style="fill:var(--fg)">Identity verdict</text>
+<text x="548" y="144" style="fill:var(--muted)">block or rate-limit the key</text>
+</g>
+<g>
+<rect x="536" y="172" width="200" height="56" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="548" y="196" font-size="13" font-weight="600" style="fill:var(--fg)">Technique and rule draft</text>
+<text x="548" y="216" style="fill:var(--muted)">back to the inline tier</text>
+</g>
+<g>
+<rect x="536" y="244" width="200" height="56" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="548" y="268" font-size="13" font-weight="600" style="fill:var(--fg)">Analyst note</text>
+<text x="548" y="288" style="fill:var(--muted)">why, in words</text>
+</g>
+</svg>
+<figcaption>Path A: four inputs, one local decoder, three outputs.</figcaption>
+</figure>
+
+<p>What supports the shape. Context features carry real signal on their own: a 2023 study detected Union and Blind SQLi from NetFlow records alone, with no payload, at a 97.4% detection rate and under 0.07% false alarms (<a href="https://www.sciencedirect.com/science/article/pii/S0167404823000032">Computers &amp; Security, 2023</a>), though on balanced lab datasets where source IP was among the retained features, so the number is a proof of signal, not a production figure. And the outputs beyond a yes/no are where a generative model has a measured record: GenXSS clustered successful attacks and had the model write rules from the clusters, blocking 86% of previously successful payloads at F1 0.9259 (<a href="https://arxiv.org/html/2504.08176">GenXSS</a>); that was an API model, so the local version is the first thing to re-measure.</p>
+
+<p>What undermines it, or is unmeasured. For the verdict itself, every head-to-head so far favours a small fine-tuned encoder over a prompted decoder: an 8B classifier matched DistilBERT on SQLi and XSS at 42× the cost (<a href="https://di0zxmb8pwajl.cloudfront.net/kics/conference/icaiic2025/presentation/1571099636.pdf">ICAIIC 2025</a>); on log sequences a fine-tuned DeBERTa-v3 reached 95.3–98.9% F1 at 12.4 ms while a local LLaMA-3-8B ran at 156 ms and GPT-4 zero-shot scored 81.2–88.3% (<a href="https://arxiv.org/html/2604.12218v1">arXiv 2604.12218, Apr 2026</a>). The nearest thing to "LLM post-processes security alerts" is an August 2026 IDS-triage study: about a third of attack alerts classified correctly zero-shot, 75–83.5% with one or two examples, on 200 alerts, using API models because the authors found open models too weak (<a href="https://link.springer.com/chapter/10.1007/978-3-032-35579-9_19">Springer, Aug 2026</a>). Whether an injection succeeded is, in principle, visible in the response (status, size, timing), but I found no 2025–2026 source that measures breach confirmation from response data; that half of the proposal has no evidence either way. And the one field report of a security classifier going from benchmark to production is a warning: 0% false positives on the benchmark, 41% on real traffic (<a href="https://www.prismor.dev/blog/prompt-injection-classifier-in-front-of-llm-judge">Prismor, Sept 2026</a>).</p>
+
+<p>The enforcement hook and its condition. The action is a block or rate-limit on the API key, user or session, reversible and logged. Because that is a heavier action than dropping one request, the number that has to exist before enforcement is switched on is the false-positive rate on the operator's own traffic, with the few-shot examples drawn from the operator's own past incidents rather than from a public benchmark. Until then Path A is an alerting layer, which it can be from day one.</p>
+
+<h2>Path B: learn per-endpoint profiles from legitimate traffic</h2>
+
+<p>The proposal: point the model at what the application's legitimate traffic looks like, endpoint by endpoint and field by field, and have it write the allow-list: which parameters exist, their types, lengths, character sets and value ranges. The inline tier then enforces a positive model, and Path A gets a definition of "unexpected" that is specific to this application rather than to attacks in general.</p>
+
+<p>This is the one path with a direct, recent test. WAPP (<a href="https://arxiv.org/html/2609.06840">arXiv 2609.06840, Sept 2026</a>) built the whole loop on DVWA, OWASP Juice Shop and a 50-endpoint Flask application: records grouped by endpoint and method, bodies parsed across JSON, form, multipart, XML/SOAP, GraphQL and text, rules constraining type, requiredness, range, character evidence and parameter sets, each rule compiled into the WAF in shadow mode and replayed against a held-out benign set and a fixed attack suite before enforcement.</p>
+
+<figure>
+<svg viewBox="0 0 760 300" role="img" aria-label="Path B: the trust filter, not the model, decides whether learned profiles are safe" font-size="11.5">
+<defs><marker id="prof-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker></defs>
+<text x="24" y="28" font-size="15" font-weight="600" style="fill:var(--fg)">Path B: the trust filter, not the model, decides whether learned profiles are safe</text>
+<g fill="none" stroke-width="1.25" style="stroke:var(--muted)">
+<path d="M188 120H212" marker-end="url(#prof-arrow)"/>
+<path d="M376 120H400" marker-end="url(#prof-arrow)"/>
+<path d="M564 120H588" marker-end="url(#prof-arrow)"/>
+<path d="M670 164V232H106V164" marker-end="url(#prof-arrow)"/>
+</g>
+<g>
+<rect x="24" y="76" width="164" height="88" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="36" y="100" font-size="13" font-weight="600" style="fill:var(--fg)">1. Collect live traffic</text>
+<text x="36" y="120" style="fill:var(--fg)">group by endpoint</text>
+<text x="36" y="136" style="fill:var(--fg)">parse JSON, form, XML</text>
+<text x="36" y="152" style="fill:var(--muted)">a learning window</text>
+</g>
+<g>
+<rect x="212" y="76" width="164" height="88" rx="8" fill="#d9962b" fill-opacity="0.12" stroke="#d9962b" stroke-width="2"/>
+<text x="224" y="100" font-size="13" font-weight="600" style="fill:var(--fg)">2. Trust-filter it</text>
+<text x="224" y="120" style="fill:var(--fg)">seven trust signals</text>
+<text x="224" y="136" style="fill:var(--fg)">effectiveness 0.53 to 0.90</text>
+<text x="224" y="152" style="fill:var(--muted)">0.5% poison breaks it</text>
+</g>
+<g>
+<rect x="400" y="76" width="164" height="88" rx="8" fill-opacity="0.12" stroke-width="2" style="fill:var(--link);stroke:var(--link)"/>
+<text x="412" y="100" font-size="13" font-weight="600" style="fill:var(--fg)">3. Synthesise rules</text>
+<text x="412" y="120" style="fill:var(--fg)">field type, range, charset</text>
+<text x="412" y="136" style="fill:var(--fg)">statistical engine chosen</text>
+<text x="412" y="152" style="fill:var(--muted)">local 27B LLM: 67–197 s</text>
+</g>
+<g>
+<rect x="588" y="76" width="164" height="88" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="600" y="100" font-size="13" font-weight="600" style="fill:var(--fg)">4. Shadow-replay</text>
+<text x="600" y="120" style="fill:var(--fg)">held-out benign traffic</text>
+<text x="600" y="136" style="fill:var(--fg)">fixed attack suite</text>
+<text x="600" y="152" style="fill:var(--muted)">then enforce or drop</text>
+</g>
+<text x="388" y="252" text-anchor="middle" style="fill:var(--muted)">enforce, watch false positives, relearn: the loop never closes on free-text fields</text>
+</svg>
+<figcaption>Path B: the WAPP pipeline, four stages and a loop. Figures from the paper.</figcaption>
+</figure>
+
+<p>Three findings from that study shape the path. First, the model is not the hard part. WAPP compared its deterministic statistical synthesiser with a local Qwen3.5-27B writing the same rules, and chose the statistical engine for "grounded, closed set rules with zero model inference cost"; the LLM took 66.9 s, 98.9 s and 197.2 s per application and, on the free-text comment field, let 20% of attacks through where the statistical rules let none. On the DVWA login endpoint the LLM did better (0.00/0.00 pass-through/FPR against 0.00/0.76), so the honest reading is: the two engines fail on different fields, and the choice is per field, not global. Second, the trust filter is the hard part. With no filtering of the learning window, effectiveness was 0.5288; with all seven trust signals, 0.9000; the 2003 Kruegel–Vigna baseline sat at 0.6231. At 0.2% poisoned training traffic the learned username policy was classified Degraded, at 0.5% Broken. An attacker who can get a few hundred requests into the learning window owns the profile. Third, the free-text problem is real and concentrated: the DVWA username field blocked 28 of 43 legitimate usernames (FPR 0.6512) at the default 0.90 value-frequency floor, while constrained fields (alphanumeric search, integer page selector) ran at FPR 0.00 and blocked all ten confirmed CRS bypasses thrown at them.</p>
+
+<p>A second line of evidence says the same thing from the anomaly-detection side: a one-class detector trained only on benign Drupal traffic reached 80.11% TPR at 0.79% FPR, against 29.55% at 15.57% for OWASP CRS at paranoia level 1 on the same traffic (<a href="https://arxiv.org/html/2609.26860">arXiv 2609.26860, Sept 2026</a>). Learning what is normal per application beats generic rules on both axes, and has done since 2003; what is new in 2026 is a measured pipeline for doing it safely.</p>
+
+<p>The enforcement hook and its conditions. Profiles for constrained fields (identifiers, enums, numbers, bounded strings) can go to enforcement after shadow replay, and violations of them are high-confidence input to Path A. Free-text fields stay in shadow mode or get character-level operator control rather than a frequency floor. And the learning window has to be trust-filtered before anything is learned from it; that filter, not the language model, is the component a next-gen WAF has to get right. Where the local decoder earns its place in this path is at the edges: naming fields, explaining a rule to an operator, and proposing per-field engine choice from the shadow-replay results, all of them offline and all of them cheap once no API is involved.</p>
+
+<h2>Path C: read session flows, not payloads</h2>
+
+<p>The proposal: brute force, credential stuffing, account enumeration and scraping are not in any single request. Each request is well-formed and passes every payload check; the abuse is the sequence, the rate and the coverage of the walk an identity takes through the endpoints. So give a model the walk, per identity, and let it decide about the identity.</p>
+
+<figure>
+<svg viewBox="0 0 760 380" role="img" aria-label="Path C reads the walk through the endpoints, not the payload" font-size="11.5">
+<defs><marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker></defs>
+<text x="24" y="28" font-size="15" font-weight="600" style="fill:var(--fg)">Path C reads the walk through the endpoints, not the payload</text>
+<text x="24" y="88" style="fill:var(--muted)">a user</text>
+<text x="24" y="136" style="fill:var(--muted)">enumeration</text>
+<g fill="none" stroke-width="1.25" style="stroke:var(--muted)">
+<path d="M200 84H220" marker-end="url(#flow-arrow)"/><path d="M320 84H340" marker-end="url(#flow-arrow)"/><path d="M440 84H460" marker-end="url(#flow-arrow)"/><path d="M560 84H580" marker-end="url(#flow-arrow)"/>
+<path d="M200 132H220" marker-end="url(#flow-arrow)"/><path d="M320 132H340" marker-end="url(#flow-arrow)"/><path d="M440 132H460" marker-end="url(#flow-arrow)"/><path d="M560 132H580" marker-end="url(#flow-arrow)"/>
+</g>
+<g fill="none" stroke-width="1.25" style="stroke:var(--muted)">
+<rect x="100" y="68" width="100" height="32" rx="8"/><rect x="220" y="68" width="100" height="32" rx="8"/><rect x="340" y="68" width="100" height="32" rx="8"/><rect x="460" y="68" width="100" height="32" rx="8"/><rect x="580" y="68" width="100" height="32" rx="8"/>
+<rect x="100" y="116" width="100" height="32" rx="8"/>
+</g>
+<g fill="#d9962b" fill-opacity="0.14" stroke="#d9962b" stroke-width="1.5">
+<rect x="220" y="116" width="100" height="32" rx="8"/><rect x="340" y="116" width="100" height="32" rx="8"/><rect x="460" y="116" width="100" height="32" rx="8"/><rect x="580" y="116" width="100" height="32" rx="8"/>
+</g>
+<g text-anchor="middle" style="fill:var(--fg)">
+<text x="150" y="88">login</text><text x="270" y="88">account</text><text x="390" y="88">orders</text><text x="510" y="88">order/:id</text><text x="630" y="88">checkout</text>
+<text x="150" y="136">login</text><text x="270" y="136">user/:id</text><text x="390" y="136">user/:id</text><text x="510" y="136">user/:id</text><text x="630" y="136">user/:id</text>
+</g>
+<text x="24" y="170" style="fill:var(--muted)">every request in both rows passes the payload tier; only the sequence differs</text>
+<g fill="none" stroke-width="1.25" style="stroke:var(--muted)">
+<path d="M174 240H214" marker-end="url(#flow-arrow)"/>
+<path d="M374 240H414" marker-end="url(#flow-arrow)"/>
+<path d="M574 240H614" marker-end="url(#flow-arrow)"/>
+<path d="M294 296V284" marker-end="url(#flow-arrow)"/>
+<path d="M675 296V284" marker-end="url(#flow-arrow)"/>
+</g>
+<g>
+<rect x="24" y="196" width="150" height="88" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="36" y="220" font-size="13" font-weight="600" style="fill:var(--fg)">Raw URL stream</text>
+<text x="36" y="240" style="fill:var(--fg)">per identity</text>
+<text x="36" y="256" style="fill:var(--muted)">ids, paths, status</text>
+</g>
+<g>
+<rect x="214" y="196" width="160" height="88" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="226" y="220" font-size="13" font-weight="600" style="fill:var(--fg)">Endpoint vocabulary</text>
+<text x="226" y="240" style="fill:var(--fg)">paths to actions</text>
+<text x="226" y="256" style="fill:var(--muted)">built once per app</text>
+</g>
+<g>
+<rect x="414" y="196" width="160" height="88" rx="8" fill-opacity="0.12" stroke-width="2" style="fill:var(--link);stroke:var(--link)"/>
+<text x="426" y="220" font-size="13" font-weight="600" style="fill:var(--fg)">Sequence model</text>
+<text x="426" y="240" style="fill:var(--fg)">fine-tuned per app</text>
+<text x="426" y="256" style="fill:var(--muted)">scores each session</text>
+</g>
+<g>
+<rect x="614" y="196" width="122" height="88" rx="8" fill="none" stroke-width="1.25" style="stroke:var(--muted)"/>
+<text x="626" y="220" font-size="13" font-weight="600" style="fill:var(--fg)">Identity verdict</text>
+<text x="626" y="240" style="fill:var(--fg)">rate-limit, block</text>
+<text x="626" y="256" style="fill:var(--muted)">seconds later</text>
+</g>
+<g>
+<rect x="214" y="296" width="522" height="56" rx="8" stroke-width="1.25" style="fill:var(--code);stroke:var(--muted)"/>
+<text x="226" y="320" font-size="13" font-weight="600" style="fill:var(--fg)">Local decoder, offline</text>
+<text x="226" y="340" style="fill:var(--fg)">builds the vocabulary from raw paths; explains flagged sessions; never scores</text>
+</g>
+</svg>
+<figcaption>Path C: two sessions on one vocabulary, then the pipeline that scores them.</figcaption>
+</figure>
+
+<p>What supports the shape. The direct analogue with a measurement is log-sequence anomaly detection, and the April 2026 benchmark settles the division of labour: on HDFS, BGL, Thunderbird and Spirit a fine-tuned DeBERTa-v3 reached 95.3–98.9% F1 at 12.4 ms per sequence, Drain + Random Forest 86.4–95.1% at 0.3 ms, GPT-4 zero-shot 81.2–88.3% at 890 ms and a local LLaMA-3-8B at 156 ms (<a href="https://arxiv.org/html/2604.12218v1">arXiv 2604.12218</a>). The small fine-tuned model wins on both axes once labelled sequences exist, and a WAF operator has years of them. KRONE shows what the generative model is for: it derives an entity–action–status hierarchy from the raw log vocabulary, detection runs on the abstraction, and the LLM touches only 1.1–3.3% of the data, a 43.7× cost reduction at up to 96.27% F1 on BGL (<a href="https://arxiv.org/html/2602.07303">arXiv 2602.07303</a>). For HTTP the equivalent is turning raw paths (with their ids, versions and query noise) into an endpoint-and-action vocabulary per application, once, offline; the sequence model then learns on that vocabulary and the decoder is not on the scoring path. On the traffic side, the same flow features carried a 24% zero-shot F1 gain for a local Llama2-7B on carpet-bombing DDoS detection in NetFlow, and 35.1% on a real operator trace (<a href="https://arxiv.org/html/2503.18487v2">arXiv 2503.18487</a>), with the authors themselves listing inference latency as the open problem.</p>
+
+<p>What undermines it, or is unmeasured. No source I found runs any of this on HTTP sessions labelled for brute force, enumeration or scraping; the log and NetFlow results are proxies. The cheap baseline is strong: ratio features per session, computed in ClickHouse with no model, cut false positives by 85% against static thresholds at 50,000 requests per second in a system described on this blog in 2023 (<a href="real-time-anomaly-detection-grafana-clickhouse.html">Real-Time Anomaly Detection for Web Traffic</a>); a sequence model has to beat that on the slow, distributed version of the attack, where per-source rates stay under every threshold and the enumeration is visible only across identities. And for the agent-driven scraper the sequence may be the wrong layer: a July 2026 study found that two LLM browsing agents produced "nearly indistinguishable event traces" and that the one operating from a real browser profile with persistent cookies and history got past reCAPTCHA v3 while the other did not; the discriminator was the environment, not the behaviour (<a href="https://arxiv.org/html/2607.18659">arXiv 2607.18659</a>). A flow model needs environment signals beside it or it will be silent on exactly that attacker.</p>
+
+<p>The enforcement hook and its condition. The action is identity-level by nature: rate-limit or block the key, user, session or source, seconds after the walk becomes recognisable. The experiment that has to run first: HTTP sessions from a honeypot or from SR-BH 2020, labelled by attack class, and three detectors side by side, ratio thresholds, a small fine-tuned sequence model on the endpoint vocabulary, and a local 7B–14B model few-shot, with F1 and per-session latency for each. The 12.4 ms and 95–99% F1 line from the log benchmark is the number to beat, and if the sequence model beats the ratios only on the slow attacks, that is still the result that justifies the path.</p>
+
+<h2>What can be switched on, and what has to be measured first</h2>
+
+<p>All three paths can run as alerting layers today; none of them should block an identity until the row's open measurement exists.</p>
+
+<table>
+<thead><tr><th>Path</th><th>Can be switched on now</th><th>Must be measured first</th><th>Number to beat</th><th>Enforcement hook</th></tr></thead>
+<tbody>
+<tr><td>A. Payload post-processing</td><td>Alerting on escalated payloads with context; rule drafts and analyst notes from a local decoder</td><td>False-positive rate on the operator's own traffic with few-shot examples from own incidents; whether response data confirms a breach; local-model bypass/valid-payload rates against GenXSS's API figures</td><td>0% benchmark vs 41% live FPR (Prismor); 75–83.5% few-shot triage accuracy (IDS study, API models); 83% valid / 80% bypass (GenXSS, GPT-4o)</td><td>Block or rate-limit the key, user or session; reversible</td></tr>
+<tr><td>B. Profiles from legitimate traffic</td><td>Shadow-mode profiles for every endpoint; enforcement on constrained fields after replay</td><td>Trust filtering of the learning window on production traffic; per-field engine choice (statistical vs LLM); free-text handling</td><td>Effectiveness 0.90 with trust filter, 0.53 without; FPR 0.00 on constrained fields, 0.65 on free text; Degraded at 0.2% poisoning (WAPP)</td><td>Positive model in the inline tier; violations feed Path A</td></tr>
+<tr><td>C. Session flows</td><td>Ratio-based session alerts; offline endpoint-vocabulary building by the decoder</td><td>F1 and per-session latency of a fine-tuned sequence model vs ratio thresholds vs a local LLM on labelled HTTP sessions; coverage of agent-driven scrapers</td><td>95.3–98.9% F1 at 12.4 ms (DeBERTa on log sequences) vs 156 ms (local LLaMA-3-8B); 85% FP reduction from ratios alone (2023)</td><td>Rate-limit or block the identity, seconds after the walk is recognisable</td></tr>
+</tbody>
+</table>
+
+<p>The common thread is where the generative model sits in each row: never in the "can be switched on" column as a verdict, always as the thing that builds the vocabulary, writes the rule, drafts the note or generates the red-team payload. That is not a limitation the premise imposes; it is what the measurements say a local decoder is good for, and it is the part of a WAF that has never had a model at all.</p>
+
+<h2>Sources</h2>
+
+<p>All opened and read on 27 September 2026. Figures from <a href="next-gen-waf.html">the first article</a> (275 µs, 14.7 ms, 42×, 60%) are cited there.</p>
+
+<table>
+<thead><tr><th>Date</th><th>Source</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>20 Sept 2026</td><td><a href="https://www.prismor.dev/blog/prompt-injection-classifier-in-front-of-llm-judge">Prismor: a classifier in front of the LLM judge</a></td><td>0% benchmark vs 41% live false positives</td></tr>
+<tr><td>Sept 2026</td><td><a href="https://arxiv.org/html/2609.06840">WAPP: Safe Learning of Positive Security WAF Policies from Live Traffic, arXiv 2609.06840</a></td><td>Path B end to end: pipeline, trust filter, poisoning, LLM vs statistical synthesis, free-text FPR</td></tr>
+<tr><td>Sept 2026</td><td><a href="https://arxiv.org/html/2609.26860">Static Embedding Models for HTTP Request Anomaly Detection, arXiv 2609.26860</a></td><td>One-class detector on benign traffic vs CRS</td></tr>
+<tr><td>18 Aug 2026</td><td><a href="https://link.springer.com/chapter/10.1007/978-3-032-35579-9_19">Let the Alerts Speak: LLM-Based IDS Alert Interpretation for SOC Triage</a></td><td>LLM triage accuracy zero- and few-shot</td></tr>
+<tr><td>21 Jul 2026</td><td><a href="https://arxiv.org/html/2607.18659">Broken Gates: Re-evaluating Web Bot Defenses in the Age of LLM Agents, arXiv 2607.18659</a></td><td>Environment vs behaviour as the discriminator for agent scrapers</td></tr>
+<tr><td>14 Apr 2026</td><td><a href="https://arxiv.org/html/2604.12218v1">LLM-Enhanced Log Anomaly Detection: A Comprehensive Benchmark, arXiv 2604.12218</a></td><td>Fine-tuned encoder vs local and API LLMs on sequences: F1 and ms</td></tr>
+<tr><td>2026</td><td><a href="https://arxiv.org/html/2602.07303">KRONE: Scalable LLM-Augmented Log Anomaly Detection via Hierarchical Abstraction, arXiv 2602.07303</a></td><td>LLM builds the abstraction, detector runs on it</td></tr>
+<tr><td>2025</td><td><a href="https://arxiv.org/html/2504.08176">GenXSS, arXiv 2504.08176</a></td><td>Rule synthesis from clustered attacks; API-model bypass rates</td></tr>
+<tr><td>2025</td><td><a href="https://di0zxmb8pwajl.cloudfront.net/kics/conference/icaiic2025/presentation/1571099636.pdf">Fine-Tuning Transformer LLMs for Detecting SQLi and XSS, ICAIIC 2025</a></td><td>8B classifier vs DistilBERT</td></tr>
+<tr><td>2025</td><td><a href="https://arxiv.org/html/2503.18487v2">LLMs powered Malicious Traffic Detection, arXiv 2503.18487</a></td><td>Local Llama2-7B on NetFlow, zero-shot F1 gains, latency named as open</td></tr>
+<tr><td>Apr 2023</td><td><a href="https://www.sciencedirect.com/science/article/pii/S0167404823000032">SQL injection attack detection in network flow data, Computers &amp; Security</a></td><td>Context-only features carry SQLi signal</td></tr>
+<tr><td>23 May 2023</td><td><a href="real-time-anomaly-detection-grafana-clickhouse.html">Real-Time Anomaly Detection for Web Traffic with Grafana and ClickHouse</a> (this blog)</td><td>Ratio-feature baseline: 85% fewer false positives at 50,000 rps</td></tr>
+</tbody>
+</table>
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>
