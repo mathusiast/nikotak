@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://nikotak.com/</loc><lastmod>2026-09-27</lastmod></url>
+  <url><loc>https://nikotak.com/</loc><lastmod>2026-09-28</lastmod></url>
   <url><loc>https://nikotak.com/bigquery-ml-at-google-cloud-next-18.html</loc><lastmod>2026-09-26</lastmod></url>
   <url><loc>https://nikotak.com/cpdos-cache-poisoned-denial-of-service.html</loc><lastmod>2026-09-26</lastmod></url>
   <url><loc>https://nikotak.com/false-positives-and-machine-learning-part-1.html</loc><lastmod>2026-09-26</lastmod></url>
@@ -16,6 +16,7 @@
   <url><loc>https://nikotak.com/rate-limiting-beyond-static-thresholds.html</loc><lastmod>2026-09-26</lastmod></url>
   <url><loc>https://nikotak.com/real-time-anomaly-detection-grafana-clickhouse.html</loc><lastmod>2026-09-26</lastmod></url>
   <url><loc>https://nikotak.com/reducing-false-positives.html</loc><lastmod>2026-09-26</lastmod></url>
+  <url><loc>https://nikotak.com/same-name-different-model.html</loc><lastmod>2026-09-28</lastmod></url>
   <url><loc>https://nikotak.com/security-across-multiple-clouds.html</loc><lastmod>2026-09-26</lastmod></url>
   <url><loc>https://nikotak.com/tragic-alley-of-the-llm.html</loc><lastmod>2026-09-27</lastmod></url>
   <url><loc>https://nikotak.com/visualizing-education-data.html</loc><lastmod>2026-09-26</lastmod></url>

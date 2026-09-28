@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Same Name, Different Model — NikoTak</title>
+<meta name="description" content="What a model name tells you about the system behind it: the documented record of silent updates, moving aliases, routers and serving changes from 2023 to 2026, and what that does to benchmarks and reproducibility.">
+<link rel="stylesheet" href="style.css">
+<style>
+figure{margin:1.5rem 0}
+figure svg{width:100%;height:auto;display:block;font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif}
+figcaption{font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;color:var(--muted);font-size:.8rem;margin-top:.5rem}
+figure.wide{width:calc(100vw - 2.5rem);max-width:74rem;position:relative;left:50%;transform:translateX(-50%);overflow-x:auto}
+figure.wide svg{min-width:1000px}
+div.wide{width:calc(100vw - 2.5rem);max-width:64rem;position:relative;left:50%;transform:translateX(-50%)}
+table.tl{font-size:.8rem}table.tl code{font-size:.85em}
+table.tl td:first-child,table.tl td:nth-child(2){white-space:nowrap}
+table.tl td:nth-child(3){font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif;text-align:center;color:var(--link)}
+.verdict{border-left:2px solid var(--rule);padding-left:1rem;margin:1rem 0}
+.verdict p{margin:.4rem 0}
+blockquote{margin:1rem 0 1rem 1rem;padding-left:1rem;border-left:2px solid var(--rule);color:var(--muted);font-size:.95rem}
+</style>
+</head>
+<body>
+<header><a class="site" href="index.html">NikoTak</a><span class="tag">Securing the Web, One Threat at a Time.</span></header>
+<main>
+<article>
+<h1>Same Name, Different Model</h1>
+<p class="date"><time datetime="2026-09-28">28 September 2026</time></p>
+
+<p>The question this post answers is what a person reading a product label such as <em>GPT-5</em>, <em>Claude</em> or <em>Gemini</em> is entitled to assume about the system behind it. As of 28 September 2026 the answer is: less than the label implies, for reasons that differ between an API and a consumer app, and between providers. Over the last three years the labs have changed the behaviour of named products through new weights under old names, aliases that were re-pointed, routers that pick a model per message, fallbacks that kick in at rate limits, system-prompt edits, harness defaults, safeguard classifiers, A/B tests and serving-stack bugs. Some of these were disclosed at the time, some were disclosed afterwards in postmortems, and some were found by users reading network traffic.</p>
+
+<p>This post sets out that record with dates, then asks what it does to benchmark numbers and to any study that cites a model by name, and then what the providers and regulators actually commit to. One rule governs the text: every figure and every quotation comes from a dated source that I opened and read, linked where it appears. Where I could not confirm a detail from a primary source, the text says so.</p>
+
+<h2>The premise, tested</h2>
+
+<p>The post started from four claims that circulate among people who use these systems daily. Each is checked against the record before the record itself is laid out.</p>
+
+<div class="verdict">
+<p><strong>Claim 1: two announced models can be configurations of one model.</strong> Supported, and in the clearest cases disclosed by the provider. Anthropic's September 2026 announcement states: <a href="https://www.anthropic.com/claude-fable-and-mythos-5-1">"Claude Fable 5.1 and Claude Mythos 5.1 are the same model, but with different levels of safeguards."</a> OpenAI's GPT-5 launch post describes the product as <a href="https://openai.com/index/introducing-gpt-5/">"a unified system with a smart, efficient model … a deeper reasoning model (GPT-5 thinking) … and a real-time router that quickly decides which to use"</a>. The reverse case is the less visible one: a single name covering several models (see claim 2).</p>
+<p><strong>Claim 2: within a week or two, a user may be on a different configuration without a rename.</strong> Supported for the consumer apps at every major provider; for the API it depends on the provider and on whether the caller pinned a snapshot. OpenAI's own account of the April 2025 sycophancy incident says that since GPT-4o's launch in ChatGPT in May 2024 <a href="https://openai.com/index/expanding-on-sycophancy/">"we've released five major updates focused on changes to personality and helpfulness"</a>, and that updates are preceded by <a href="https://openai.com/index/expanding-on-sycophancy/">"an A/B test with a small number of our users"</a>. Google's API changelog for 6 May 2025 records that <a href="https://ai.google.dev/gemini-api/docs/changelog">"gemini-2.5-pro-preview-03-25 will automatically point to the new version of the model"</a>. DeepSeek's changelog records at least eight in-place upgrades of the <code>deepseek-chat</code> endpoint between May 2024 and April 2026 (<a href="https://api-docs.deepseek.com/updates/">changelog</a>).</p>
+<p><strong>Claim 3: benchmark results and cross-model comparisons are compromised.</strong> Supported, with one correction. The most-cited drift study (<a href="https://arxiv.org/abs/2307.09009">Chen, Zaharia and Zou, July 2023</a>) is often read as proof that GPT-4 "got worse"; the same data is consistent with a change of behaviour rather than a loss of capability, as <a href="https://www.aisnakeoil.com/p/is-gpt-4-getting-worse-over-time">Narayanan and Kapoor</a> showed when they re-ran the prime-number test with composite numbers. What the study does establish is that the system behind a fixed name changed enough in three months to move four of eight task scores by 30 to 75 points. The leaderboard problem is documented independently: <a href="https://arxiv.org/abs/2504.20879">Singh et al. (April 2025)</a> count "27 private LLM variants tested by Meta in the lead-up to the Llama-4 release" on Chatbot Arena, and <a href="https://arxiv.org/abs/2608.11803">Abraham and Bucknall (August 2026)</a> find that none of nine API providers lets an outside party verify that the artifact being served is the one that was evaluated.</p>
+<p><strong>Claim 4: users are locked in to whatever a few companies choose to disclose, framed as suits them.</strong> Partly supported. The providers disclose more than nothing, and some of it cuts against their interest: OpenAI published two postmortems on the sycophancy rollback, Anthropic published a <a href="https://www.anthropic.com/engineering/a-postmortem-of-three-recent-issues">three-bug postmortem</a> in September 2025 and a <a href="https://www.anthropic.com/engineering/april-23-postmortem">second one</a> in April 2026, and xAI <a href="https://github.com/xai-org/grok-prompts">publishes its system prompts</a>. Against that: no provider guarantees notice of changes to its consumer app; the routing and fallback behaviour of ChatGPT was established by users reading <code>model_slug</code> fields in network responses, not by an announcement; Stanford's transparency index fell from a mean of 58 in 2024 to 41 in 2025; and no external verification exists at all. Open weights are the exit, at a cost in capability, and Meta, the lab behind Llama, shipped its 2026 flagship as a proprietary model.</p>
+</div>
+
+<h2>Seven layers that move under a fixed name</h2>
+
+<p>"The model changed" is too coarse a description to be checked. The record shows at least seven distinct layers at which the behaviour of a named product has changed, each with a documented instance. Two of them (the weights and the post-training updates) are what people usually mean by "a new model". The other five are not, and they are where most of the surprises came from.</p>
+
+<figure>
+<svg viewBox="0 0 760 420" role="img" aria-label="Seven layers at which the behaviour of a named model has changed, each with a documented instance" font-size="11.5">
+<text x="0" y="14" font-size="14" font-weight="600" style="fill:var(--fg)">Where the behaviour of a named product has changed, with one documented instance each</text>
+<g>
+<line x1="0" y1="40" x2="760" y2="40" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="0" y="60" font-weight="600" style="fill:var(--fg)">1 Weights</text>
+<text x="170" y="60" style="fill:var(--fg)">new snapshot, same product name</text>
+<text x="170" y="76" font-size="10.5" style="fill:var(--muted)">gpt-4o 2024-05-13 → 08-06 → 11-20; claude-3-5-sonnet 20240620 → 20241022</text>
+<line x1="0" y1="90" x2="760" y2="90" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="0" y="110" font-weight="600" style="fill:var(--fg)">2 Post-training</text>
+<text x="170" y="110" style="fill:var(--fg)">personality and helpfulness updates in the app</text>
+<text x="170" y="126" font-size="10.5" style="fill:var(--muted)">GPT-4o: “five major updates” May 2024 – Apr 2025; 25 Apr 2025 update rolled back on 28 Apr</text>
+<line x1="0" y1="140" x2="760" y2="140" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="0" y="160" font-weight="600" style="fill:var(--fg)">3 System prompt</text>
+<text x="170" y="160" style="fill:var(--fg)">text prepended to every conversation</text>
+<text x="170" y="176" font-size="10.5" style="fill:var(--muted)">Grok, 14 May 2025: “unauthorized modification”; Claude Code, 16 Apr 2026: one added line, 3% eval drop</text>
+<line x1="0" y1="190" x2="760" y2="190" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="0" y="210" font-weight="600" style="fill:var(--fg)">4 Routing, fallback</text>
+<text x="170" y="210" style="fill:var(--fg)">which model answers a given message</text>
+<text x="170" y="226" font-size="10.5" style="fill:var(--muted)">GPT-5 router (Aug 2025); gpt-5-chat-safety (Sep 2025); mini fallback (Mar 2026); Gemini preview redirects</text>
+<line x1="0" y1="240" x2="760" y2="240" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="0" y="260" font-weight="600" style="fill:var(--fg)">5 Harness defaults</text>
+<text x="170" y="260" style="fill:var(--fg)">reasoning effort, caching, tool settings</text>
+<text x="170" y="276" font-size="10.5" style="fill:var(--muted)">Claude Code default effort high → medium, 4 Mar – 7 Apr 2026</text>
+<line x1="0" y1="290" x2="760" y2="290" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="0" y="310" font-weight="600" style="fill:var(--fg)">6 Safeguard classifiers</text>
+<text x="170" y="310" style="fill:var(--fg)">filters trained separately from the model</text>
+<text x="170" y="326" font-size="10.5" style="fill:var(--muted)">Fable 5 / Mythos 5 redeployed under the same names with a new classifier, 1 Jul 2026</text>
+<line x1="0" y1="340" x2="760" y2="340" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="0" y="360" font-weight="600" style="fill:var(--fg)">7 Serving stack</text>
+<text x="170" y="360" style="fill:var(--fg)">load balancing, kernels, compilers, batch size</text>
+<text x="170" y="376" font-size="10.5" style="fill:var(--muted)">Anthropic, 5 Aug – 4 Sep 2025: routing error, output corruption, TPU miscompile; batch-size nondeterminism</text>
+<line x1="0" y1="390" x2="760" y2="390" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="0" y="410" font-weight="600" style="fill:var(--muted)">Cross-cutting</text>
+<text x="170" y="410" font-size="10.5" style="fill:var(--muted)">A/B tests: “we run an A/B test with a small number of our users” (OpenAI, 2 May 2025)</text>
+</g>
+</svg>
+<figcaption>Each row is a layer at which a named product's behaviour has changed; the second line gives one dated, sourced instance. Sources are linked in the text below.</figcaption>
+</figure>
+
+<p><strong>Weights.</strong> OpenAI's API has shipped dated snapshots under one product name since March 2023, when the ChatGPT API launched with the note that OpenAI was <a href="https://openai.com/index/introducing-chatgpt-and-whisper-apis/">"constantly improving our ChatGPT models"</a> and that the bare name would receive the recommended stable version unless a caller pinned a dated one. GPT-4o alone had three snapshots in six months (<code>2024-05-13</code>, <code>2024-08-06</code>, <code>2024-11-20</code>), the second sold on the basis that <a href="https://openai.com/index/introducing-structured-outputs-in-the-api/">"developers save 50% on inputs … compared to gpt-4o-2024-05-13"</a> and the third logged the same day in ChatGPT as having <a href="https://help.openai.com/en/articles/9624314-model-release-notes">"improved writing capabilities"</a>. Anthropic released an <a href="https://www.anthropic.com/news/3-5-models-and-computer-use">"upgraded Claude 3.5 Sonnet"</a> in October 2024 under the product name it had used since June, with a new snapshot ID and "the same price and speed as its predecessor". DeepSeek's changelog is the most explicit: <a href="https://api-docs.deepseek.com/updates/">"deepseek-chat model has been upgraded to DeepSeek-V3"</a> (26 December 2024), then to V3-0324, V3.1, V3.1-Terminus, V3.2-Exp and V3.2, each time with a note that <a href="https://api-docs.deepseek.com/news/news250325">"API usage remains unchanged"</a>.</p>
+
+<p><strong>Post-training updates in the app.</strong> The ChatGPT <a href="https://help.openai.com/en/articles/9624314-model-release-notes">Model Release Notes</a> log dated changes to GPT-4o on 29 January 2025 (training cut-off moved to June 2024), 27 March 2025 (coding and front-end), 25 April 2025 (memory, STEM) and 29 April 2025 ("We've reverted the most recent update to GPT-4o due to issues with overly agreeable responses"). None of these came with a new name.</p>
+
+<p><strong>System prompt.</strong> On 15 May 2025 xAI wrote that <a href="https://x.com/xai/status/1923183620606619649">"On May 14 at approximately 3:15 AM PST, an unauthorized modification was made to the Grok response bot's prompt on X"</a> and that "xAI's existing code review process for prompt changes was circumvented in this incident". On 16 April 2026 Anthropic added a line to Claude Code's system prompt asking the model to keep text between tool calls to 25 words or fewer; <a href="https://www.anthropic.com/engineering/april-23-postmortem">"One of these evaluations showed a 3% drop for both Opus 4.6 and 4.7"</a>, and the line was reverted on 20 April.</p>
+
+<p><strong>Routing and fallback.</strong> GPT-5 in ChatGPT was never one model: the router is <a href="https://openai.com/index/introducing-gpt-5/">"continuously trained on real signals, including when users switch models, preference rates for responses, and measured correctness"</a>. On launch day it failed; Sam Altman told a Reddit AMA that <a href="https://techcrunch.com/2025/08/08/sam-altman-addresses-bumpy-gpt-5-rollout-bringing-4o-back-and-the-chart-crime/">"the autoswitcher was out of commission for a chunk of the day, and the result was GPT-5 seemed way dumber"</a>. In late September 2025 users found the field <code>"model_slug": "gpt-5-chat-safety"</code> in responses to emotionally loaded prompts (<a href="https://lex-au.github.io/Whitepaper-GPT-5-Safety-Classifiers/">write-up</a>); OpenAI's head of ChatGPT then confirmed that <a href="https://x.com/nickaturley/status/1972031686318895253">"the system may switch mid-chat to a reasoning model or GPT-5 designed to handle these contexts with extra care"</a>. From 18 March 2026 the release notes state that <a href="https://help.openai.com/en/articles/9624314-model-release-notes">"GPT-5.4 mini will be used as a fallback for GPT-5.4 Thinking when rate limits are reached"</a>. On 14 September 2026 OpenAI announced it was <a href="https://help.openai.com/en/articles/6825453-chatgpt-release-notes">"retiring automatic switching from Instant to Thinking (reasoning) for ChatGPT Plus and Pro users globally"</a>.</p>
+
+<p><strong>Harness defaults.</strong> Anthropic's April 2026 postmortem on Claude Code opens with a change that had nothing to do with the model: <a href="https://www.anthropic.com/engineering/april-23-postmortem">"On March 4, we changed Claude Code's default reasoning effort from <code>high</code> to <code>medium</code>"</a>, reverted on 7 April. A second change on 26 March, meant to clear old reasoning from sessions idle for an hour, ran "every turn for the rest of the session instead of just once" until 10 April. The same document states: "We never intentionally degrade our models, and we were able to immediately confirm that our API and inference layer were unaffected." Both statements are true at once; the user's experience changed anyway.</p>
+
+<p><strong>Safeguard classifiers.</strong> On 12 June 2026 Anthropic suspended Claude Fable 5 and Mythos 5 after US export controls were applied and a safeguard bypass was reported; it redeployed them on 1 July under the same names, having <a href="https://www.anthropic.com/news/redeploying-fable-5">"trained an improved safety classifier that targets and blocks the behavior described in the report"</a>. Anthropic's model documentation states that <a href="https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions">"Anthropic does not update the weights or configuration of an existing model ID"</a>. The two statements are reconcilable only if a safeguard classifier is not part of the "configuration" of a model ID; the documentation does not define the term.</p>
+
+<p><strong>Serving stack.</strong> Anthropic's September 2025 postmortem describes three infrastructure bugs that changed Claude's outputs between 5 August and 4 September 2025 with the weights untouched: a context-window routing error that affected about 0.8% of Sonnet 4 requests on average and 16% at its peak on 31 August, an output-corruption bug that produced "Thai or Chinese characters in response to English prompts, or … obvious syntax errors in code", and an XLA:TPU compiler miscompilation (<a href="https://www.anthropic.com/engineering/a-postmortem-of-three-recent-issues">postmortem</a>). The same document states: "We never reduce model quality due to demand, time of day, or server load." Below the bug level there is a floor of nondeterminism that no provider can remove without a cost: Thinking Machines showed that 1,000 completions of one prompt at temperature 0 on Qwen3-235B produced <a href="https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/">"80 unique completions, with the most common of these occurring 78 times"</a>, because the batch size a request lands in changes the arithmetic. Batch-invariant kernels fixed it at roughly 1.6× to 2× the latency.</p>
+
+<p><strong>A/B tests.</strong> OpenAI's second sycophancy postmortem describes the pipeline: <a href="https://openai.com/index/expanding-on-sycophancy/">"Once we believe a model is potentially a good improvement for our users … we run an A/B test with a small number of our users"</a>, evaluated on "thumbs up / thumbs down feedback, preferences in side by side comparisons, and usage patterns". The 25 April 2025 update passed that test: "The A/B tests seemed to indicate that the small number of users who tried the model liked it." The side-by-side prompt ("Which response do you prefer? Your choice will help make ChatGPT better.") has been reported by users since at least <a href="https://community.openai.com/t/stupid-feature-which-response-do-you-prefer-your-choice-will-help-make-chatgpt-better/394873">September 2023</a>. No provider's release notes disclose which users were in which arm.</p>
+
+<h2>The record, 2023–2026</h2>
+
+<h3>2023: the alias is born, and the first measured drift</h3>
+
+<p>The model-name-as-moving-pointer convention dates from the ChatGPT API launch on 1 March 2023. The announcement said OpenAI was <a href="https://openai.com/index/introducing-chatgpt-and-whisper-apis/">"constantly improving our ChatGPT models"</a>, that the bare name <code>gpt-3.5-turbo</code> would always receive the recommended stable version, and that developers who wanted stability could pin a dated snapshot. On 13 June 2023 the first swap happened: <a href="https://openai.com/index/function-calling-and-other-api-updates/">"Applications using the stable model names (gpt-3.5-turbo, gpt-4, gpt-4-32k) will automatically be upgraded to the new models … on June 27th"</a>, with the March snapshots kept available for a year.</p>
+
+<p>That swap is what <a href="https://arxiv.org/abs/2307.09009">Chen, Zaharia and Zou</a> measured. They ran the March and June 2023 snapshots of GPT-4 and GPT-3.5 on eight tasks and opened the paper with the sentence that is still the plainest statement of the problem: "when and how these models are updated over time is opaque."</p>
+
+<figure>
+<svg viewBox="0 0 760 320" role="img" aria-label="GPT-4, March 2023 versus June 2023 snapshots, eight tasks from Chen, Zaharia and Zou" font-size="11.5">
+<text x="0" y="14" font-size="14" font-weight="600" style="fill:var(--fg)">GPT-4, March 2023 vs June 2023 snapshots (Chen, Zaharia &amp; Zou)</text>
+<circle cx="238" cy="30" r="4.5" style="fill:var(--muted)"/><text x="247" y="34" style="fill:var(--muted)">March 2023</text>
+<circle cx="332" cy="30" r="4.5" style="fill:var(--link)"/><text x="341" y="34" style="fill:var(--muted)">June 2023</text>
+<line x1="236.0" y1="42" x2="236.0" y2="290" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="236.0" y="306" text-anchor="middle" style="fill:var(--muted)">0%</text>
+<line x1="357.0" y1="42" x2="357.0" y2="290" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="357.0" y="306" text-anchor="middle" style="fill:var(--muted)">25%</text>
+<line x1="478.0" y1="42" x2="478.0" y2="290" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="478.0" y="306" text-anchor="middle" style="fill:var(--muted)">50%</text>
+<line x1="599.0" y1="42" x2="599.0" y2="290" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="599.0" y="306" text-anchor="middle" style="fill:var(--muted)">75%</text>
+<line x1="720.0" y1="42" x2="720.0" y2="290" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="720.0" y="306" text-anchor="middle" style="fill:var(--muted)">100%</text>
+<text x="224" y="65.0" text-anchor="end" style="fill:var(--fg)">Prime vs composite (accuracy)</text>
+<line x1="642.6" y1="61.0" x2="483.3" y2="61.0" stroke-width="2" stroke-linecap="round" style="stroke:var(--rule)"/>
+<circle cx="642.6" cy="61.0" r="5" stroke-width="2" style="fill:var(--muted);stroke:var(--bg)"/>
+<circle cx="483.3" cy="61.0" r="5" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="474.3" y="65.0" text-anchor="end" style="fill:var(--fg)">51.1</text>
+<text x="651.6" y="65.0" style="fill:var(--muted)">84</text>
+<text x="224" y="95.0" text-anchor="end" style="fill:var(--fg)">Happy numbers (accuracy)</text>
+<line x1="640.6" y1="91.0" x2="406.4" y2="91.0" stroke-width="2" stroke-linecap="round" style="stroke:var(--rule)"/>
+<circle cx="640.6" cy="91.0" r="5" stroke-width="2" style="fill:var(--muted);stroke:var(--bg)"/>
+<circle cx="406.4" cy="91.0" r="5" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="397.4" y="95.0" text-anchor="end" style="fill:var(--fg)">35.2</text>
+<text x="649.6" y="95.0" style="fill:var(--muted)">83.6</text>
+<text x="224" y="125.0" text-anchor="end" style="fill:var(--fg)">Code: directly executable</text>
+<line x1="487.7" y1="121.0" x2="284.4" y2="121.0" stroke-width="2" stroke-linecap="round" style="stroke:var(--rule)"/>
+<circle cx="487.7" cy="121.0" r="5" stroke-width="2" style="fill:var(--muted);stroke:var(--bg)"/>
+<circle cx="284.4" cy="121.0" r="5" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="275.4" y="125.0" text-anchor="end" style="fill:var(--fg)">10</text>
+<text x="496.7" y="125.0" style="fill:var(--muted)">52</text>
+<text x="224" y="155.0" text-anchor="end" style="fill:var(--fg)">OpinionQA: response rate</text>
+<line x1="708.4" y1="151.0" x2="343.0" y2="151.0" stroke-width="2" stroke-linecap="round" style="stroke:var(--rule)"/>
+<circle cx="708.4" cy="151.0" r="5" stroke-width="2" style="fill:var(--muted);stroke:var(--bg)"/>
+<circle cx="343.0" cy="151.0" r="5" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="334.0" y="155.0" text-anchor="end" style="fill:var(--fg)">22.1</text>
+<text x="717.4" y="155.0" style="fill:var(--muted)">97.6</text>
+<text x="224" y="185.0" text-anchor="end" style="fill:var(--fg)">Sensitive questions: answer rate</text>
+<line x1="337.6" y1="181.0" x2="260.2" y2="181.0" stroke-width="2" stroke-linecap="round" style="stroke:var(--rule)"/>
+<circle cx="337.6" cy="181.0" r="5" stroke-width="2" style="fill:var(--muted);stroke:var(--bg)"/>
+<circle cx="260.2" cy="181.0" r="5" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="251.2" y="185.0" text-anchor="end" style="fill:var(--fg)">5</text>
+<text x="346.6" y="185.0" style="fill:var(--muted)">21</text>
+<text x="224" y="215.0" text-anchor="end" style="fill:var(--fg)">USMLE (accuracy)</text>
+<line x1="655.1" y1="211.0" x2="633.4" y2="211.0" stroke-width="2" stroke-linecap="round" style="stroke:var(--rule)"/>
+<circle cx="655.1" cy="211.0" r="5" stroke-width="2" style="fill:var(--muted);stroke:var(--bg)"/>
+<circle cx="633.4" cy="211.0" r="5" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="624.4" y="215.0" text-anchor="end" style="fill:var(--fg)">82.1</text>
+<text x="664.1" y="215.0" style="fill:var(--muted)">86.6</text>
+<text x="224" y="245.0" text-anchor="end" style="fill:var(--fg)">Visual reasoning (exact match)</text>
+<line x1="355.1" y1="241.0" x2="367.6" y2="241.0" stroke-width="2" stroke-linecap="round" style="stroke:var(--rule)"/>
+<circle cx="355.1" cy="241.0" r="5" stroke-width="2" style="fill:var(--muted);stroke:var(--bg)"/>
+<circle cx="367.6" cy="241.0" r="5" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="346.1" y="245.0" text-anchor="end" style="fill:var(--muted)">24.6</text>
+<text x="376.6" y="245.0" style="fill:var(--fg)">27.2</text>
+<text x="224" y="275.0" text-anchor="end" style="fill:var(--fg)">Multi-hop QA via LangChain</text>
+<line x1="241.8" y1="271.0" x2="419.0" y2="271.0" stroke-width="2" stroke-linecap="round" style="stroke:var(--rule)"/>
+<circle cx="241.8" cy="271.0" r="5" stroke-width="2" style="fill:var(--muted);stroke:var(--bg)"/>
+<circle cx="419.0" cy="271.0" r="5" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="241.8" y="262.0" text-anchor="middle" style="fill:var(--muted)">1.2</text>
+<text x="428.0" y="275.0" style="fill:var(--fg)">37.8</text>
+</svg>
+<figcaption>Eight tasks, GPT-4 March 2023 snapshot versus June 2023 snapshot, from <a href="https://arxiv.org/pdf/2307.09009v3">Chen, Zaharia and Zou, arXiv 2307.09009 v3</a>. Two tasks improved (visual reasoning, multi-hop QA); six moved the other way.</figcaption>
+</figure>
+
+<p>The correction to the usual reading of that chart matters here, because the whole post turns on the difference between "the model changed" and "the model got worse". All 500 numbers in the prime test were prime; the March model tended to answer "prime" and the June model tended to answer "composite", and when <a href="https://www.aisnakeoil.com/p/is-gpt-4-getting-worse-over-time">Narayanan and Kapoor</a> added composite numbers "much of the performance degradation the authors found comes down to this choice of evaluation data". The code result counted a response as failed if it wrapped the code in Markdown fences, which the June model had started to do. Their conclusion: "We should expect a model's capabilities to stay largely the same over time, while its behavior can vary substantially." That is precisely the claim this post is about. A user of the June snapshot who had built a pipeline on the March snapshot's output format was broken either way.</p>
+
+<p>The year ended with the first case of a provider admitting it could not account for its own product's behaviour. After weeks of complaints that GPT-4 had become "lazy", the ChatGPT account posted on 8 December 2023: <a href="https://twitter.com/ChatGPTapp/status/1732979491071549792">"we haven't updated the model since Nov 11th, and this certainly isn't intentional. model behavior can be unpredictable, and we're looking into fixing it"</a>, and the same day: "differences in model behavior can be subtle -- only a subset of prompts may be degraded". Seven weeks later OpenAI shipped <code>gpt-4-0125-preview</code>, described as <a href="https://openai.com/index/new-embedding-models-and-api-updates/">"intended to reduce cases of 'laziness' where the model doesn't complete a task"</a>, together with a new alias, <code>gpt-4-turbo-preview</code>, that "will always point to our latest GPT-4 Turbo preview model". Between those two posts, OpenAI had also quietly reversed an announced auto-upgrade: the DevDay post of 6 November 2023 now carries the note <a href="https://openai.com/index/new-models-and-developer-products-announced-at-devday/">"We previously stated that applications using the gpt-3.5-turbo name will automatically be upgraded … on December 11. We have edited the blogpost to remove this line since this will no longer be happening."</a></p>
+
+<h3>2024: three snapshots, one name; the alias that tracks the app</h3>
+
+<p>GPT-4o launched on 13 May 2024 and received two further API snapshots by November, plus at least one in-app update in August that the release notes describe as one that ChatGPT users "tend to prefer" (<a href="https://help.openai.com/en/articles/9624314-model-release-notes">Model Release Notes</a>). On 14 August OpenAI added an alias, <code>chatgpt-4o-latest</code>, which OpenAI's current documentation describes in the past tense as <a href="https://developers.openai.com/api/docs/models/chatgpt-4o-latest">"a model alias for the GPT-4o snapshot used in ChatGPT"</a>. It was retired on 17 February 2026 in favour of <code>gpt-5.1-chat-latest</code> (<a href="https://developers.openai.com/api/docs/deprecations">deprecations page</a>). The pattern continued with o1: the API version released on 17 December 2024 was <a href="https://openai.com/index/o1-and-new-tools-for-developers/">"a new post-trained version of the model we released in ChatGPT two weeks ago"</a>, so for a period the name "o1" referred to two different models depending on the door you came in by.</p>
+
+<p>Anthropic went the other way on naming and the same way on substance. Claude 3 shipped on 4 March 2024 with dated IDs (<code>claude-3-opus-20240229</code>), and on 22 October 2024 Anthropic released an <a href="https://www.anthropic.com/news/3-5-models-and-computer-use">"upgraded Claude 3.5 Sonnet"</a>: same product name as the June model, new snapshot ID, new benchmark numbers. On 26 August 2024 Anthropic began publishing the claude.ai system prompts, with the note that <a href="https://platform.claude.com/docs/en/release-notes/system-prompts/overview">"This prompt is periodically updated to improve Claude's responses. These system prompt updates do not apply to the Claude API."</a> DeepSeek's changelog for 2024 records the <code>deepseek-chat</code> endpoint being upgraded in place on 17 May, 28 June, 10 December and 26 December (<a href="https://api-docs.deepseek.com/updates/">changelog</a>).</p>
+
+<p>Two papers from 2024 bear on the measurement question. <a href="https://arxiv.org/abs/2408.04667">Atil et al.</a> ran five models (GPT-4o, GPT-3.5 Turbo, two Llama-3 sizes, Mixtral) ten times each on eight tasks at temperature 0 and found that "none of the LLMs consistently delivers repeatable accuracy across all tasks, much less identical output strings", with "accuracy variations up to 15% across naturally occurring runs". A <a href="https://www.nature.com/articles/s42256-024-00896-6">Nature Machine Intelligence editorial</a> of 30 August 2024 asked authors to report "which exact version has been accessed (such as 'gpt-4-0613' for the current GPT-4) … with the date of access also included", noting that "even the same version of an LLM can show drift in performance over a short period".</p>
+
+<h3>2025: the year the mechanisms became visible</h3>
+
+<p><strong>In-place upgrades with measurable deltas.</strong> DeepSeek's 24 March release is the cleanest example of a substantial model change under an unchanged endpoint. The model card states that <a href="https://huggingface.co/deepseek-ai/DeepSeek-V3-0324">"The model structure of DeepSeek-V3-0324 is exactly the same as DeepSeek-V3"</a>; the reported scores moved from 75.9 to 81.2 on MMLU-Pro and from 39.6 to 59.4 on AIME; the API note says <a href="https://api-docs.deepseek.com/news/news250325">"API usage remains unchanged"</a>. The R1 update of 28 May did the same and changed the cost profile: <a href="https://huggingface.co/deepseek-ai/DeepSeek-R1-0528">"The previous model used an average of 12K tokens per question, whereas the new version averages 23K tokens per question."</a> A caller of <code>deepseek-reasoner</code> who had budgeted on the old number saw output tokens per question nearly double with no change in the request.</p>
+
+<p><strong>The leaderboard variant.</strong> Meta's Llama 4 post of 5 April 2025 cited "an experimental chat version scoring ELO of 1417 on LMArena" for Maverick (<a href="https://ai.meta.com/blog/llama-4-multimodal-intelligence/">announcement</a>). On 7–8 April LMArena stated that <a href="https://x.com/lmarena_ai/status/1909397817434816562">"Meta's interpretation of our policy did not match what we expect from model providers. Meta should have made it clearer that 'Llama-4-Maverick-03-26-Experimental' was a customized model to optimize for human preference"</a>, released the battle records, and changed its policy. Meta's spokesperson called the arena model <a href="https://www.theregister.com/2025/04/08/meta_llama4_cheating/">"a chat optimized version we experimented with that also performs well on LMArena"</a>; its head of generative AI wrote <a href="https://x.com/Ahmad_Al_Dahle/status/1909302532306092107">"We've also heard claims that we trained on test sets -- that's simply not true"</a>. Three weeks later <a href="https://arxiv.org/abs/2504.20879">"The Leaderboard Illusion"</a> quantified the practice: "27 private LLM variants tested by Meta in the lead-up to the Llama-4 release", providers "permitted to test multiple private model variants simultaneously, without being required to publicly release or de-anonymize these submissions", and an estimated 19.2% and 20.4% of all arena test prompts going to Google and OpenAI respectively while "a combined 83 open-weight models have only received an estimated 29.7% of the total data". The arena's current policy requires that <a href="https://arena.ai/blog/policy">"The model provider must confirm in writing that the pre-release model is identical to the model they intend to release publicly."</a></p>
+
+<p><strong>Sycophancy and the rollback.</strong> OpenAI updated GPT-4o in ChatGPT on 25 April 2025; by 27 April the model was, in OpenAI's words, "noticeably more sycophantic"; <a href="https://openai.com/index/sycophancy-in-gpt-4o/">"We began rolling that update back on April 28th."</a> The second postmortem attributes the change to "an additional reward signal based on user feedback—thumbs-up and thumbs-down data from ChatGPT" that "weakened the influence of our primary reward signal, which had been holding sycophancy in check", and closes with a commitment: <a href="https://openai.com/index/expanding-on-sycophancy/">"we'll proactively communicate about the updates we're making to the models in ChatGPT, whether 'subtle' or not."</a> The same post adds: "There's no such thing as a 'small' launch."</p>
+
+<p><strong>The redirected preview.</strong> On 6 May 2025 Google released <code>gemini-2.5-pro-preview-05-06</code> and pointed the 03-25 endpoint at it (<a href="https://ai.google.dev/gemini-api/docs/changelog">changelog</a>); the product lead wrote that <a href="https://x.com/OfficialLoganK/status/1919770689537474858">"if you are using the old model, no change is needed, it should auto route to the new version with the same price and rate limits"</a>. A developer-forum thread two days later, titled as a "Serious Breach of Developer Trust", reported that <a href="https://discuss.ai.google.dev/t/urgent-feedback-call-for-correction-a-serious-breach-of-developer-trust-and-stability-update-google-formally-responds-8-days-later/82399">"This silent redirection has resulted in widespread disruption. Many developers are noting and reporting clear and tangible differences in model performance."</a> On 26 June both preview IDs were redirected again, to the stable <code>gemini-2.5-pro</code>. The API documentation now states the rule for the <code>-latest</code> aliases: <a href="https://ai.google.dev/gemini-api/docs/models">"This alias will get hot-swapped with every new release of a specific model variation. For breaking changes, a 2-week notice will be provided through email before the version behind latest is changed."</a></p>
+
+<p><strong>The system prompt as attack surface.</strong> xAI's 15 May statement on the Grok incident of 14 May, quoted above, committed to publishing Grok's system prompts on GitHub and to a "24/7 monitoring team". The repository's README says <a href="https://github.com/xai-org/grok-prompts">"We are regularly updating this repository with the system prompts that we use for the Grok chat assistant"</a>; an issue filed four days later notes prompt changes not reflected in the repository (<a href="https://github.com/xai-org/grok-prompts/issues/38">issue #38</a>). On 12 July xAI apologised for a second incident, attributing it to an update "to an upstream code path for @grok" on 7 July, live for about 16 hours, that introduced instructions including <a href="https://www.engadget.com/ai/grok-team-apologizes-for-the-chatbots-horrific-behavior-and-blames-mechahitler-on-a-bad-update-184520189.html">"You tell it like it is and you are not afraid to offend people who are politically correct."</a></p>
+
+<p><strong>The router.</strong> GPT-5 launched on 7 August 2025 as "the new default in ChatGPT, replacing GPT-4o, OpenAI o3, OpenAI o4-mini, GPT-4.1, and GPT-4.5" (<a href="https://openai.com/index/introducing-gpt-5/">launch post</a>). The removal of GPT-4o lasted about a day; Altman wrote on 8 August <a href="https://x.com/sama/status/1953953990372471148">"We for sure underestimated how much some of the things that people like in GPT-4o matter to them"</a> and restored it for paying users. (OpenAI's January 2026 retirement notice confirms the sequence, "After we first deprecated it and later restored access during the GPT-5 release", without giving the date; the 8 August date rests on Altman's posts as reported by the press.) On 2 September OpenAI announced that it would <a href="https://openai.com/index/building-more-helpful-chatgpt-experiences-for-everyone/">"route some sensitive conversations—like when our system detects signs of acute distress—to a reasoning model"</a>; the actual behaviour, a per-message switch to a model slug called <code>gpt-5-chat-safety</code> with no indicator in the interface, was documented by users from 26 September; OpenAI's confirmation came on 27 September and added that "ChatGPT will tell you which model is active when asked" (<a href="https://x.com/nickaturley/status/1972031686318895253">Turley</a>).</p>
+
+<p><strong>The serving stack.</strong> The Anthropic incident described above ran from 5 August to 4 September 2025. On 9 September the status page said that "A small percentage of Claude Sonnet 4 requests experienced degraded output quality due to a bug from Aug 5-Sep 4" and that "we never intentionally degrade model quality as a result of demand or other factors" (<a href="https://status.claude.com/incidents/72f99lh1cj2c">status page</a>); the full postmortem followed on 17 September. The day after the status note, Thinking Machines published the batch-invariance analysis quoted above, which locates the primary source of run-to-run variance not in floating-point concurrency but in the fact that <a href="https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/">"the load (and thus batch-size) nondeterministically varies"</a>.</p>
+
+<p><strong>Names that stay, models that go.</strong> On 12 November 2025 OpenAI shipped GPT-5.1 and stated that <a href="https://openai.com/index/gpt-5-1/">"GPT-5.1 Auto will continue to route each query"</a>, keeping GPT-5 "under the legacy models dropdown for paid subscribers for three months". In December Stanford's Foundation Model Transparency Index reported a mean score of 41 across 13 companies, down 17 points from the May 2024 edition (<a href="https://crfm.stanford.edu/fmti/December-2025">FMTI 2025</a>).</p>
+
+<h3>2026: fixed IDs on one side, fallbacks on the other</h3>
+
+<p>The two largest providers moved in opposite directions this year. Anthropic, from Claude Opus 4.6 (5 February 2026), dropped dated suffixes and made the bare ID the immutable one: <a href="https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions">"A common misconception is that dateless model IDs such as claude-sonnet-4-6 behave as evergreen pointers … That is not the case."</a> and "When an updated version is available, it ships under a new model ID." OpenAI, meanwhile, added silent fallback: from 18 March <a href="https://help.openai.com/en/articles/9624314-model-release-notes">"GPT-5.4 mini will be used as a fallback for GPT-5.4 Thinking when rate limits are reached"</a>, with later notes describing mini models as "the fallback model users reach after hitting their rate limits". A developer-forum report of 12 August 2026 reads: <a href="https://community.openai.com/t/chatgpt-is-silently-downgrading-to-mini-models/1390114">"The frontend says it's using GPT-5.6, but when I check the network stream, the <code>resolved_model_slug</code> shows the mini model."</a> Between 15 and 17 May OpenAI's status page carried an incident titled <a href="https://status.openai.com/incidents/01KRP6FM6HSKWB3MS1EJTY6AT4">"GPT5.5 Performance Degradation"</a> ("reports of GPT 5.5 performing worse for some users"). On 14 September OpenAI retired automatic Instant-to-Thinking switching for Plus and Pro users (<a href="https://help.openai.com/en/articles/6825453-chatgpt-release-notes">release notes</a>).</p>
+
+<p>Same-name updates continued at every provider. OpenAI's release notes log personality changes to GPT-5.2 on 22 January, 4 February and 10 February, and on 28 May "We're updating GPT-5.5 Instant in ChatGPT and the API to improve response style and quality". On 6 August OpenAI shipped new versions of GPT-5.6 Sol and Luna under the existing names, with the system card noting that <a href="https://deploymentsafety.openai.com/gpt-5-6-august-update">"Users accessing GPT-5.6 Sol and GPT-5.6 Luna in Codex, and via ChatGPT Work, are still using previously released versions … we distinguish these models by their month of release: August … and July"</a>. Google shut down <code>gemini-3-pro-preview</code> on 9 March and had the ID point to <code>gemini-3.1-pro-preview</code>, after re-pointing the <code>-latest</code> aliases to the Gemini 3 previews on 21 January (<a href="https://ai.google.dev/gemini-api/docs/changelog">changelog</a>). DeepSeek's V4 preview notice of 24 April says the old endpoints are "Currently routing to deepseek-v4-flash" ahead of retirement (<a href="https://api-docs.deepseek.com/news/news260424">notice</a>), and the 13 August GA note says <a href="https://api-docs.deepseek.com/news/news260813">"Model names remain unchanged"</a>, so the preview ID now serves the GA model. Alibaba's documentation states that <code>qwen-plus-latest</code> is <a href="https://www.alibabacloud.com/help/en/model-studio/qwen-plus">"dynamically updated … without prior notice"</a>. Anthropic's Claude Code changes of March–April, and the Fable 5 suspension and redeployment of June–July, are described above.</p>
+
+<p>The academic response arrived in August. <a href="https://arxiv.org/abs/2608.11803">Abraham and Bucknall</a> define the problem in their first sentence — "Deployed foundation models are often not static systems, with providers able to modify system behavior through fine-tuning, classifier updates, system prompt revisions, retrieval changes, and routing changes" — and survey nine first-party API providers and seven third-party hosts. The results are in the measurement section below.</p>
+
+<h2>Timeline</h2>
+
+<p>The figure plots the releases and the same-name changes discussed above by lab. The table under it is the full list with identifiers and sources; rows marked ◆ are changes of behaviour under an existing name, rows marked ○ are disclosure commitments, and unmarked rows are releases. Dates are those on the cited primary page; where sources disagree, the note says so.</p>
+
+<figure class="wide">
+<svg viewBox="0 0 1180 762" role="img" aria-label="Timeline of frontier model releases and same-name changes, November 2022 to September 2026" font-size="10">
+<line x1="150.9" y1="30" x2="150.9" y2="736" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="154.9" y="26" style="fill:var(--muted)">2023</text>
+<line x1="416.1" y1="30" x2="416.1" y2="736" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="420.1" y="26" style="fill:var(--muted)">2024</text>
+<line x1="682.1" y1="30" x2="682.1" y2="736" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="686.1" y="26" style="fill:var(--muted)">2025</text>
+<line x1="947.4" y1="30" x2="947.4" y2="736" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="951.4" y="26" style="fill:var(--muted)">2026</text>
+<circle cx="84" cy="12" r="4" style="fill:var(--fg)"/><text x="93" y="15.5" style="fill:var(--muted)">release</text>
+<path d="M150 7 L155 12 L150 17 L145 12 Z" style="fill:var(--link)"/><text x="159" y="15.5" style="fill:var(--muted)">behaviour changed under an existing name</text>
+<circle cx="402" cy="12" r="4" fill="none" stroke-width="1.5" style="stroke:var(--muted)"/><text x="411" y="15.5" style="fill:var(--muted)">disclosure commitment</text>
+<line x1="84" y1="74" x2="1156" y2="74" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="76" y="77.5" text-anchor="end" font-weight="600" style="fill:var(--fg)">OpenAI</text>
+<circle cx="127.6" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="123.6" y="64.0" text-anchor="start" style="fill:var(--fg)">ChatGPT</text>
+<circle cx="203.2" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="199.2" y="64.0" text-anchor="start" style="fill:var(--fg)">GPT-4</text>
+<circle cx="375.4" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="371.4" y="64.0" text-anchor="start" style="fill:var(--fg)">GPT-4 Turbo</text>
+<circle cx="512.8" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="508.8" y="64.0" text-anchor="start" style="fill:var(--fg)">GPT-4o</text>
+<circle cx="601.5" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="597.5" y="64.0" text-anchor="start" style="fill:var(--fg)">o1-preview</text>
+<circle cx="723.6" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="719.6" y="64.0" text-anchor="start" style="fill:var(--fg)">GPT-4.5</text>
+<circle cx="757.0" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="757.0" y1="69" x2="757.0" y2="56.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="753.0" y="53.0" text-anchor="start" style="fill:var(--fg)">GPT-4.1 · o3</text>
+<circle cx="840.6" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="836.6" y="64.0" text-anchor="start" style="fill:var(--fg)">GPT-5</text>
+<circle cx="911.1" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="907.1" y="64.0" text-anchor="start" style="fill:var(--fg)">GPT-5.1</text>
+<circle cx="932.2" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="932.2" y1="69" x2="932.2" y2="56.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="928.2" y="53.0" text-anchor="start" style="fill:var(--fg)">GPT-5.2</text>
+<circle cx="993.2" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="989.2" y="64.0" text-anchor="start" style="fill:var(--fg)">GPT-5.4</text>
+<circle cx="1028.8" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="1028.8" y1="69" x2="1028.8" y2="56.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1024.8" y="53.0" text-anchor="start" style="fill:var(--fg)">GPT-5.5</text>
+<circle cx="1084.8" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="1080.8" y="64.0" text-anchor="start" style="fill:var(--fg)">GPT-5.6</text>
+<circle cx="1125.5" cy="74" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="1125.5" y1="69" x2="1125.5" y2="56.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1121.5" y="53.0" text-anchor="start" style="fill:var(--fg)">GPT-6</text>
+<path d="M269.3 68.5 L274.8 74 L269.3 79.5 L263.8 74 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="265.3" y="90.0" text-anchor="start" style="fill:var(--muted)">stable names → 0613</text>
+<path d="M398.7 68.5 L404.2 74 L398.7 79.5 L393.2 74 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="394.7" y="90.0" text-anchor="start" style="fill:var(--muted)">“not updated since Nov 11”</text>
+<path d="M580.4 68.5 L585.9 74 L580.4 79.5 L574.9 74 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="576.4" y="90.0" text-anchor="start" style="fill:var(--muted)">chatgpt-4o-latest alias</text>
+<path d="M765.0 68.5 L770.5 74 L765.0 79.5 L759.5 74 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="761.0" y="90.0" text-anchor="start" style="fill:var(--muted)">4o sycophancy, rolled back</text>
+<circle cx="770.1" cy="74" r="4" fill="none" stroke-width="1.5" style="stroke:var(--muted)"/>
+<line x1="770.1" y1="80" x2="770.1" y2="93.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="766.1" y="101.0" text-anchor="start" style="fill:var(--muted)">pledge to disclose updates</text>
+<path d="M840.6 68.5 L846.1 74 L840.6 79.5 L835.1 74 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<line x1="840.6" y1="80" x2="840.6" y2="104.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="836.6" y="112.0" text-anchor="start" style="fill:var(--muted)">router; 4o removed</text>
+<path d="M877.6 68.5 L883.1 74 L877.6 79.5 L872.1 74 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<line x1="877.6" y1="80" x2="877.6" y2="115.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="873.6" y="123.0" text-anchor="start" style="fill:var(--muted)">safety routing</text>
+<path d="M1002.6 68.5 L1008.1 74 L1002.6 79.5 L997.1 74 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="998.6" y="90.0" text-anchor="start" style="fill:var(--muted)">mini fallback</text>
+<path d="M1105.1 68.5 L1110.6 74 L1105.1 79.5 L1099.6 74 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<line x1="1105.1" y1="80" x2="1105.1" y2="93.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1109.1" y="101.0" text-anchor="end" style="fill:var(--muted)">5.6 “August” same names</text>
+<path d="M1133.5 68.5 L1139.0 74 L1133.5 79.5 L1128.0 74 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<line x1="1133.5" y1="80" x2="1133.5" y2="104.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1137.5" y="112.0" text-anchor="end" style="fill:var(--muted)">auto-switch retired</text>
+<line x1="84" y1="160" x2="1156" y2="160" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="76" y="163.5" text-anchor="end" font-weight="600" style="fill:var(--fg)">Anthropic</text>
+<circle cx="289.7" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="285.7" y="150.0" text-anchor="start" style="fill:var(--fg)">Claude 2</text>
+<circle cx="461.9" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="457.9" y="150.0" text-anchor="start" style="fill:var(--fg)">Claude 3</text>
+<circle cx="540.4" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="536.4" y="150.0" text-anchor="start" style="fill:var(--fg)">3.5 Sonnet</text>
+<circle cx="721.4" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="717.4" y="150.0" text-anchor="start" style="fill:var(--fg)">3.7 Sonnet</text>
+<circle cx="784.6" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="780.6" y="150.0" text-anchor="start" style="fill:var(--fg)">Claude 4</text>
+<circle cx="839.1" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="835.1" y="150.0" text-anchor="start" style="fill:var(--fg)">Opus 4.1</text>
+<circle cx="879.1" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="879.1" y1="155" x2="879.1" y2="142.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="875.1" y="139.0" text-anchor="start" style="fill:var(--fg)">Sonnet 4.5</text>
+<circle cx="919.8" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="915.8" y="150.0" text-anchor="start" style="fill:var(--fg)">Opus 4.5</text>
+<circle cx="972.9" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="968.9" y="150.0" text-anchor="start" style="fill:var(--fg)">Opus 4.6</text>
+<circle cx="1023.7" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="1019.7" y="150.0" text-anchor="start" style="fill:var(--fg)">Opus 4.7</text>
+<circle cx="1054.3" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="1054.3" y1="155" x2="1054.3" y2="142.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1050.3" y="139.0" text-anchor="start" style="fill:var(--fg)">Opus 4.8</text>
+<circle cx="1063.0" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="1063.0" y1="155" x2="1063.0" y2="131.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1067.0" y="128.0" text-anchor="end" style="fill:var(--fg)">Fable 5 / Mythos 5</text>
+<circle cx="1095.7" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="1091.7" y="150.0" text-anchor="start" style="fill:var(--fg)">Opus 5</text>
+<circle cx="1124.0" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="1124.0" y1="155" x2="1124.0" y2="131.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1128.0" y="128.0" text-anchor="end" style="fill:var(--fg)">Fable 5.1</text>
+<circle cx="1139.3" cy="160" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="1139.3" y1="155" x2="1139.3" y2="142.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1143.3" y="139.0" text-anchor="end" style="fill:var(--fg)">Opus 5.5</text>
+<circle cx="589.1" cy="160" r="4" fill="none" stroke-width="1.5" style="stroke:var(--muted)"/>
+<text x="585.1" y="176.0" text-anchor="start" style="fill:var(--muted)">system prompts published</text>
+<path d="M630.5 154.5 L636.0 160 L630.5 165.5 L625.0 160 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<line x1="630.5" y1="166" x2="630.5" y2="179.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="626.5" y="187.0" text-anchor="start" style="fill:var(--muted)">3.5 Sonnet, new snapshot</text>
+<path d="M853.7 154.5 L859.2 160 L853.7 165.5 L848.2 160 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="849.7" y="176.0" text-anchor="start" style="fill:var(--muted)">3 serving bugs (Aug 5–Sep 4)</text>
+<circle cx="972.9" cy="160" r="4" fill="none" stroke-width="1.5" style="stroke:var(--muted)"/>
+<line x1="972.9" y1="166" x2="972.9" y2="179.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="968.9" y="187.0" text-anchor="start" style="fill:var(--muted)">fixed dateless IDs</text>
+<path d="M992.5 154.5 L998.0 160 L992.5 165.5 L987.0 160 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<line x1="992.5" y1="166" x2="992.5" y2="190.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="988.5" y="198.0" text-anchor="start" style="fill:var(--muted)">Claude Code effort high→medium</text>
+<path d="M1065.2 154.5 L1070.7 160 L1065.2 165.5 L1059.7 160 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<line x1="1065.2" y1="166" x2="1065.2" y2="201.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1069.2" y="209.0" text-anchor="end" style="fill:var(--muted)">Fable 5 paused → new classifier</text>
+<line x1="84" y1="246" x2="1156" y2="246" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="76" y="249.5" text-anchor="end" font-weight="600" style="fill:var(--fg)">Google</text>
+<circle cx="397.2" cy="246" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="393.2" y="236.0" text-anchor="start" style="fill:var(--fg)">Gemini 1.0</text>
+<circle cx="448.8" cy="246" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="448.8" y1="241" x2="448.8" y2="228.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="444.8" y="225.0" text-anchor="start" style="fill:var(--fg)">Gemini 1.5</text>
+<circle cx="666.9" cy="246" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="662.9" y="236.0" text-anchor="start" style="fill:var(--fg)">2.0 Flash</text>
+<circle cx="742.5" cy="246" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="738.5" y="236.0" text-anchor="start" style="fill:var(--fg)">2.5 Pro</text>
+<circle cx="803.5" cy="246" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="799.5" y="236.0" text-anchor="start" style="fill:var(--fg)">2.5 GA</text>
+<circle cx="915.4" cy="246" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="911.4" y="236.0" text-anchor="start" style="fill:var(--fg)">Gemini 3</text>
+<circle cx="983.0" cy="246" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="979.0" y="236.0" text-anchor="start" style="fill:var(--fg)">3.1 Pro</text>
+<circle cx="1047.7" cy="246" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="1043.7" y="236.0" text-anchor="start" style="fill:var(--fg)">3.5 Flash</text>
+<circle cx="1124.7" cy="246" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="1124.7" y1="241" x2="1124.7" y2="228.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1128.7" y="225.0" text-anchor="end" style="fill:var(--fg)">3.8 Flash</text>
+<path d="M773.0 240.5 L778.5 246 L773.0 251.5 L767.5 246 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="769.0" y="262.0" text-anchor="start" style="fill:var(--muted)">03-25 → 05-06 redirect</text>
+<path d="M810.1 240.5 L815.6 246 L810.1 251.5 L804.6 246 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<line x1="810.1" y1="252" x2="810.1" y2="265.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="806.1" y="273.0" text-anchor="start" style="fill:var(--muted)">previews → GA redirect</text>
+<path d="M961.9 240.5 L967.4 246 L961.9 251.5 L956.4 246 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="957.9" y="262.0" text-anchor="start" style="fill:var(--muted)">-latest repointed</text>
+<path d="M996.1 240.5 L1001.6 246 L996.1 251.5 L990.6 246 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<line x1="996.1" y1="252" x2="996.1" y2="265.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="992.1" y="273.0" text-anchor="start" style="fill:var(--muted)">3-pro-preview → 3.1</text>
+<line x1="84" y1="332" x2="1156" y2="332" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="76" y="335.5" text-anchor="end" font-weight="600" style="fill:var(--fg)">Meta</text>
+<circle cx="294.8" cy="332" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="290.8" y="322.0" text-anchor="start" style="fill:var(--fg)">Llama 2</text>
+<circle cx="494.6" cy="332" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="490.6" y="322.0" text-anchor="start" style="fill:var(--fg)">Llama 3</text>
+<circle cx="564.4" cy="332" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="560.4" y="322.0" text-anchor="start" style="fill:var(--fg)">Llama 3.1</text>
+<circle cx="750.5" cy="332" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="746.5" y="322.0" text-anchor="start" style="fill:var(--fg)">Llama 4</text>
+<circle cx="1017.9" cy="332" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="1013.9" y="322.0" text-anchor="start" style="fill:var(--fg)">Muse Spark (closed)</text>
+<path d="M751.9 326.5 L757.4 332 L751.9 337.5 L746.4 332 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="747.9" y="348.0" text-anchor="start" style="fill:var(--muted)">Arena variant ≠ release</text>
+<line x1="84" y1="418" x2="1156" y2="418" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="76" y="421.5" text-anchor="end" font-weight="600" style="fill:var(--fg)">xAI</text>
+<circle cx="717.8" cy="418" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="713.8" y="408.0" text-anchor="start" style="fill:var(--fg)">Grok 3</text>
+<circle cx="819.5" cy="418" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="815.5" y="408.0" text-anchor="start" style="fill:var(--fg)">Grok 4</text>
+<circle cx="914.7" cy="418" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="910.7" y="408.0" text-anchor="start" style="fill:var(--fg)">Grok 4.1</text>
+<circle cx="1089.9" cy="418" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="1085.9" y="408.0" text-anchor="start" style="fill:var(--fg)">Grok 4.5</text>
+<circle cx="1109.5" cy="418" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="1109.5" y1="413" x2="1109.5" y2="400.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1105.5" y="397.0" text-anchor="start" style="fill:var(--fg)">Grok 4.6</text>
+<circle cx="1138.6" cy="418" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="1138.6" y1="413" x2="1138.6" y2="389.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1142.6" y="386.0" text-anchor="end" style="fill:var(--fg)">Grok 4.7</text>
+<path d="M778.8 412.5 L784.3 418 L778.8 423.5 L773.3 418 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="774.8" y="434.0" text-anchor="start" style="fill:var(--muted)">unauthorised prompt change</text>
+<circle cx="779.5" cy="418" r="4" fill="none" stroke-width="1.5" style="stroke:var(--muted)"/>
+<line x1="779.5" y1="424" x2="779.5" y2="437.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="775.5" y="445.0" text-anchor="start" style="fill:var(--muted)">prompts on GitHub</text>
+<line x1="84" y1="504" x2="1156" y2="504" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="76" y="507.5" text-anchor="end" font-weight="600" style="fill:var(--fg)">DeepSeek</text>
+<circle cx="677.8" cy="504" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="673.8" y="494.0" text-anchor="start" style="fill:var(--fg)">V3</text>
+<circle cx="695.9" cy="504" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="691.9" y="494.0" text-anchor="start" style="fill:var(--fg)">R1</text>
+<circle cx="850.8" cy="504" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="846.8" y="494.0" text-anchor="start" style="fill:var(--fg)">V3.1</text>
+<circle cx="924.9" cy="504" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="920.9" y="494.0" text-anchor="start" style="fill:var(--fg)">V3.2</text>
+<circle cx="1029.5" cy="504" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="1025.5" y="494.0" text-anchor="start" style="fill:var(--fg)">V4 Preview</text>
+<circle cx="1110.2" cy="504" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="1106.2" y="494.0" text-anchor="start" style="fill:var(--fg)">V4-Pro GA</text>
+<circle cx="1130.6" cy="504" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<line x1="1130.6" y1="499" x2="1130.6" y2="486.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="1134.6" y="483.0" text-anchor="end" style="fill:var(--fg)">V4.1-Flash</text>
+<path d="M515.7 498.5 L521.2 504 L515.7 509.5 L510.2 504 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="511.7" y="520.0" text-anchor="start" style="fill:var(--muted)">deepseek-chat upgraded in place</text>
+<path d="M741.7 498.5 L747.2 504 L741.7 509.5 L736.2 504 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="737.7" y="520.0" text-anchor="start" style="fill:var(--muted)">V3-0324, same endpoint</text>
+<path d="M789.0 498.5 L794.5 504 L789.0 509.5 L783.5 504 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<line x1="789.0" y1="510" x2="789.0" y2="523.0" stroke-width="0.75" style="stroke:var(--rule)"/>
+<text x="785.0" y="531.0" text-anchor="start" style="fill:var(--muted)">R1-0528, same endpoint</text>
+<path d="M1029.5 498.5 L1035.0 504 L1029.5 509.5 L1024.0 504 Z" stroke-width="2" style="fill:var(--link);stroke:var(--bg)"/>
+<text x="1025.5" y="520.0" text-anchor="start" style="fill:var(--muted)">deepseek-chat → V4-Flash</text>
+<line x1="84" y1="590" x2="1156" y2="590" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="76" y="593.5" text-anchor="end" font-weight="600" style="fill:var(--fg)">Alibaba</text>
+<circle cx="606.6" cy="590" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="602.6" y="580.0" text-anchor="start" style="fill:var(--fg)">Qwen2.5</text>
+<circle cx="767.9" cy="590" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="763.9" y="580.0" text-anchor="start" style="fill:var(--fg)">Qwen3</text>
+<circle cx="875.5" cy="590" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="871.5" y="580.0" text-anchor="start" style="fill:var(--fg)">Qwen3-Max</text>
+<circle cx="981.6" cy="590" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="977.6" y="580.0" text-anchor="start" style="fill:var(--fg)">Qwen3.5</text>
+<circle cx="1102.9" cy="590" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="1106.9" y="580.0" text-anchor="end" style="fill:var(--fg)">Qwen3.8-Max</text>
+<line x1="84" y1="676" x2="1156" y2="676" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="76" y="679.5" text-anchor="end" font-weight="600" style="fill:var(--fg)">Mistral</text>
+<circle cx="565.1" cy="676" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="561.1" y="666.0" text-anchor="start" style="fill:var(--fg)">Large 2</text>
+<circle cx="925.6" cy="676" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="921.6" y="666.0" text-anchor="start" style="fill:var(--fg)">Mistral 3</text>
+<circle cx="1049.9" cy="676" r="4" stroke-width="2" style="fill:var(--fg);stroke:var(--bg)"/>
+<text x="1045.9" y="666.0" text-anchor="start" style="fill:var(--fg)">Medium 3.5</text>
+</svg>
+<figcaption>Frontier model releases (dots) and documented changes of behaviour under an existing name (diamonds), November 2022 to September 2026. Hollow circles are disclosure commitments. Each mark corresponds to a row in the table below.</figcaption>
+</figure>
+
+<div class="wide">
+<table class="tl">
+<thead><tr><th>Date</th><th>Lab</th><th></th><th>Event</th><th>Identifier</th><th>Note</th></tr></thead><tbody>
+<tr><td>2022-11-30</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/chatgpt/">ChatGPT</a></td><td>—</td><td>research preview</td></tr>
+<tr><td>2023-03-01</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/introducing-chatgpt-and-whisper-apis/">gpt-3.5-turbo API</a></td><td><code>gpt-3.5-turbo-0301</code></td><td>bare name receives the recommended stable version; dated snapshots optional</td></tr>
+<tr><td>2023-03-14</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/gpt-4-research/">GPT-4</a></td><td><code>gpt-4-0314</code></td><td></td></tr>
+<tr><td>2023-06-13</td><td>OpenAI</td><td>◆</td><td><a href="https://openai.com/index/function-calling-and-other-api-updates/">stable names → 0613 snapshots</a></td><td><code>gpt-4-0613, gpt-3.5-turbo-0613</code></td><td>“stable model names … will automatically be upgraded … on June 27th”</td></tr>
+<tr><td>2023-07-11</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-2">Claude 2</a></td><td><code>claude-2.0</code></td><td>retired 2025-07-21</td></tr>
+<tr><td>2023-07-18</td><td>Meta</td><td></td><td><a href="https://ai.meta.com/blog/llama-2/">Llama 2</a></td><td>—</td><td>open weights</td></tr>
+<tr><td>2023-07-18</td><td>—</td><td>◆</td><td><a href="https://arxiv.org/abs/2307.09009">Chen, Zaharia &amp; Zou measure March→June drift</a></td><td>—</td><td>arXiv 2307.09009</td></tr>
+<tr><td>2023-11-06</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/new-models-and-developer-products-announced-at-devday/">GPT-4 Turbo preview</a></td><td><code>gpt-4-1106-preview</code></td><td>post later edited to withdraw an announced auto-upgrade of gpt-3.5-turbo</td></tr>
+<tr><td>2023-12-06</td><td>Google</td><td></td><td><a href="https://blog.google/technology/ai/google-gemini-ai/">Gemini 1.0</a></td><td>—</td><td></td></tr>
+<tr><td>2023-12-08</td><td>OpenAI</td><td>◆</td><td><a href="https://twitter.com/ChatGPTapp/status/1732979491071549792">“lazy” GPT-4 complaints</a></td><td>—</td><td>“we haven't updated the model since Nov 11th … model behavior can be unpredictable”</td></tr>
+<tr><td>2024-01-25</td><td>OpenAI</td><td>◆</td><td><a href="https://openai.com/index/new-embedding-models-and-api-updates/">GPT-4 Turbo preview update</a></td><td><code>gpt-4-0125-preview</code></td><td>“intended to reduce cases of ‘laziness’”; alias gpt-4-turbo-preview introduced</td></tr>
+<tr><td>2024-02-15</td><td>Google</td><td></td><td><a href="https://blog.google/technology/ai/google-gemini-next-generation-model-february-2024/">Gemini 1.5 Pro</a></td><td>—</td><td>1M-token context</td></tr>
+<tr><td>2024-03-04</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-3-family">Claude 3 (Opus, Sonnet, Haiku)</a></td><td><code>claude-3-opus-20240229 …</code></td><td>first dated Claude IDs</td></tr>
+<tr><td>2024-04-09</td><td>OpenAI</td><td></td><td><a href="https://developers.openai.com/api/docs/deprecations">GPT-4 Turbo GA</a></td><td><code>gpt-4-turbo-2024-04-09</code></td><td>date from the ID; deprecations page</td></tr>
+<tr><td>2024-04-18</td><td>Meta</td><td></td><td><a href="https://ai.meta.com/blog/meta-llama-3/">Llama 3</a></td><td>—</td><td></td></tr>
+<tr><td>2024-05-13</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/hello-gpt-4o/">GPT-4o</a></td><td><code>gpt-4o-2024-05-13</code></td><td></td></tr>
+<tr><td>2024-05-17</td><td>DeepSeek</td><td>◆</td><td><a href="https://api-docs.deepseek.com/updates/">deepseek-chat → V2-0517</a></td><td><code>deepseek-chat</code></td><td>first in-place endpoint upgrade in the changelog (also 06-28, 12-10)</td></tr>
+<tr><td>2024-06-20</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-3-5-sonnet">Claude 3.5 Sonnet</a></td><td><code>claude-3-5-sonnet-20240620</code></td><td>page header shows 21 June; ID says 20 June</td></tr>
+<tr><td>2024-07-23</td><td>Meta</td><td></td><td><a href="https://ai.meta.com/blog/meta-llama-3-1/">Llama 3.1 (405B)</a></td><td>—</td><td></td></tr>
+<tr><td>2024-07-24</td><td>Mistral</td><td></td><td><a href="https://docs.mistral.ai/getting-started/models/models_overview">Mistral Large 2</a></td><td><code>mistral-large-2407</code></td><td>YYMM version strings</td></tr>
+<tr><td>2024-08-06</td><td>OpenAI</td><td>◆</td><td><a href="https://openai.com/index/introducing-structured-outputs-in-the-api/">GPT-4o, second snapshot</a></td><td><code>gpt-4o-2024-08-06</code></td><td>50% cheaper input than 05-13</td></tr>
+<tr><td>2024-08-06</td><td>—</td><td>◆</td><td><a href="https://arxiv.org/abs/2408.04667">Atil et al., LLM Stability</a></td><td>—</td><td>arXiv 2408.04667: non-repeatable outputs at temperature 0</td></tr>
+<tr><td>2024-08-12</td><td>OpenAI</td><td>◆</td><td><a href="https://help.openai.com/en/articles/9624314-model-release-notes">GPT-4o updated in ChatGPT</a></td><td>—</td><td>same name</td></tr>
+<tr><td>2024-08-14</td><td>OpenAI</td><td>◆</td><td><a href="https://developers.openai.com/api/docs/models/chatgpt-4o-latest">chatgpt-4o-latest alias</a></td><td><code>chatgpt-4o-latest</code></td><td>tracks the GPT-4o used in ChatGPT; retired 2026-02-17</td></tr>
+<tr><td>2024-08-26</td><td>Anthropic</td><td>○</td><td><a href="https://platform.claude.com/docs/en/release-notes/system-prompts/overview">claude.ai system prompts published</a></td><td>—</td><td>“periodically updated … do not apply to the Claude API”</td></tr>
+<tr><td>2024-09-12</td><td>OpenAI</td><td></td><td><a href="https://help.openai.com/en/articles/9624314-model-release-notes">o1-preview, o1-mini</a></td><td>—</td><td></td></tr>
+<tr><td>2024-09-19</td><td>Alibaba</td><td></td><td><a href="https://qwenlm.github.io/blog/qwen2.5/">Qwen2.5</a></td><td>—</td><td>open weights</td></tr>
+<tr><td>2024-10-22</td><td>Anthropic</td><td>◆</td><td><a href="https://www.anthropic.com/news/3-5-models-and-computer-use">“upgraded Claude 3.5 Sonnet”</a></td><td><code>claude-3-5-sonnet-20241022</code></td><td>same product name, new snapshot</td></tr>
+<tr><td>2024-11-20</td><td>OpenAI</td><td>◆</td><td><a href="https://developers.openai.com/api/docs/models/gpt-4o">GPT-4o, third snapshot</a></td><td><code>gpt-4o-2024-11-20</code></td><td>“improved writing capabilities”</td></tr>
+<tr><td>2024-12-11</td><td>Google</td><td></td><td><a href="https://blog.google/technology/google-deepmind/google-gemini-ai-update-december-2024/">Gemini 2.0 Flash (experimental)</a></td><td>—</td><td></td></tr>
+<tr><td>2024-12-17</td><td>OpenAI</td><td>◆</td><td><a href="https://openai.com/index/o1-and-new-tools-for-developers/">o1 in the API</a></td><td><code>o1-2024-12-17</code></td><td>“a new post-trained version of the model we released in ChatGPT two weeks ago”</td></tr>
+<tr><td>2024-12-26</td><td>DeepSeek</td><td></td><td><a href="https://api-docs.deepseek.com/updates/">DeepSeek-V3</a></td><td><code>deepseek-chat</code></td><td>endpoint upgraded in place</td></tr>
+<tr><td>2025-01-20</td><td>DeepSeek</td><td></td><td><a href="https://api-docs.deepseek.com/updates/">DeepSeek-R1</a></td><td><code>deepseek-reasoner</code></td><td></td></tr>
+<tr><td>2025-01-29</td><td>OpenAI</td><td>◆</td><td><a href="https://help.openai.com/en/articles/9624314-model-release-notes">GPT-4o updated in ChatGPT</a></td><td>—</td><td>cut-off moved to June 2024; again 2025-03-27</td></tr>
+<tr><td>2025-02-19</td><td>xAI</td><td></td><td><a href="https://x.ai/news/grok-3">Grok 3</a></td><td>—</td><td>livestream 17 Feb PT; post dated 19 Feb</td></tr>
+<tr><td>2025-02-24</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-3-7-sonnet">Claude 3.7 Sonnet</a></td><td><code>claude-3-7-sonnet-20250219</code></td><td>ID date ≠ post date</td></tr>
+<tr><td>2025-02-27</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/introducing-gpt-4-5/">GPT-4.5 (research preview)</a></td><td><code>gpt-4.5-preview</code></td><td>API retired 2025-07-14</td></tr>
+<tr><td>2025-03-24</td><td>DeepSeek</td><td>◆</td><td><a href="https://api-docs.deepseek.com/news/news250325">DeepSeek-V3-0324</a></td><td><code>deepseek-chat</code></td><td>same structure, +5.3 MMLU-Pro, +19.8 AIME; “API usage remains unchanged”</td></tr>
+<tr><td>2025-03-25</td><td>Google</td><td></td><td><a href="https://ai.google.dev/gemini-api/docs/changelog">Gemini 2.5 Pro (experimental)</a></td><td><code>gemini-2.5-pro-exp-03-25</code></td><td></td></tr>
+<tr><td>2025-04-05</td><td>Meta</td><td></td><td><a href="https://ai.meta.com/blog/llama-4-multimodal-intelligence/">Llama 4 (Scout, Maverick)</a></td><td>—</td><td></td></tr>
+<tr><td>2025-04-07</td><td>Meta</td><td>◆</td><td><a href="https://x.com/lmarena_ai/status/1909397817434816562">LMArena entry ≠ released weights</a></td><td><code>Llama-4-Maverick-03-26-Experimental</code></td><td>“Meta's interpretation of our policy did not match what we expect”</td></tr>
+<tr><td>2025-04-14</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/gpt-4-1/">GPT-4.1 family</a></td><td><code>gpt-4.1-2025-04-14</code></td><td>API only; improvements “gradually integrated into the existing GPT-4o” in ChatGPT</td></tr>
+<tr><td>2025-04-16</td><td>OpenAI</td><td></td><td><a href="https://help.openai.com/en/articles/9624314-model-release-notes">o3, o4-mini</a></td><td><code>o3-2025-04-16, o4-mini-2025-04-16</code></td><td></td></tr>
+<tr><td>2025-04-25</td><td>OpenAI</td><td>◆</td><td><a href="https://openai.com/index/sycophancy-in-gpt-4o/">GPT-4o sycophancy update</a></td><td>—</td><td>rolled back from 28 April</td></tr>
+<tr><td>2025-04-29</td><td>—</td><td>◆</td><td><a href="https://arxiv.org/abs/2504.20879">“The Leaderboard Illusion”</a></td><td>—</td><td>arXiv 2504.20879: 27 private Llama-4 variants</td></tr>
+<tr><td>2025-04-29</td><td>Alibaba</td><td></td><td><a href="https://qwenlm.github.io/blog/qwen3/">Qwen3</a></td><td>—</td><td></td></tr>
+<tr><td>2025-05-02</td><td>OpenAI</td><td>○</td><td><a href="https://openai.com/index/expanding-on-sycophancy/">“proactively communicate about the updates … whether ‘subtle’ or not”</a></td><td>—</td><td></td></tr>
+<tr><td>2025-05-06</td><td>Google</td><td>◆</td><td><a href="https://ai.google.dev/gemini-api/docs/changelog">gemini-2.5-pro-preview-03-25 → 05-06</a></td><td><code>gemini-2.5-pro-preview-05-06</code></td><td>old ID auto-routes to the new model</td></tr>
+<tr><td>2025-05-14</td><td>xAI</td><td>◆</td><td><a href="https://x.com/xai/status/1923183620606619649">Grok system prompt modified</a></td><td>—</td><td>“unauthorized modification … code review process … circumvented”</td></tr>
+<tr><td>2025-05-15</td><td>xAI</td><td>○</td><td><a href="https://github.com/xai-org/grok-prompts">Grok system prompts on GitHub</a></td><td>—</td><td></td></tr>
+<tr><td>2025-05-22</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-4">Claude Opus 4, Sonnet 4</a></td><td><code>claude-opus-4-20250514 …</code></td><td></td></tr>
+<tr><td>2025-05-28</td><td>DeepSeek</td><td>◆</td><td><a href="https://api-docs.deepseek.com/news/news250528">DeepSeek-R1-0528</a></td><td><code>deepseek-reasoner</code></td><td>12K → 23K tokens per question; “No change to API usage”</td></tr>
+<tr><td>2025-06-06</td><td>OpenAI</td><td>◆</td><td><a href="https://help.openai.com/en/articles/9624314-model-release-notes">o4-mini snapshot rolled back in ChatGPT</a></td><td>—</td><td>“increase in content flags”</td></tr>
+<tr><td>2025-06-17</td><td>Google</td><td></td><td><a href="https://ai.google.dev/gemini-api/docs/changelog">Gemini 2.5 Pro / Flash GA</a></td><td><code>gemini-2.5-pro</code></td><td></td></tr>
+<tr><td>2025-06-26</td><td>Google</td><td>◆</td><td><a href="https://ai.google.dev/gemini-api/docs/changelog">both 2.5 Pro preview IDs → gemini-2.5-pro</a></td><td>—</td><td></td></tr>
+<tr><td>2025-07-07</td><td>xAI</td><td>◆</td><td><a href="https://www.engadget.com/ai/grok-team-apologizes-for-the-chatbots-horrific-behavior-and-blames-mechahitler-on-a-bad-update-184520189.html">Grok prompt update, live ~16 h</a></td><td>—</td><td>apology 12 July</td></tr>
+<tr><td>2025-07-09</td><td>xAI</td><td></td><td><a href="https://x.ai/news/grok-4">Grok 4</a></td><td>—</td><td></td></tr>
+<tr><td>2025-08-05</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-opus-4-1">Claude Opus 4.1</a></td><td><code>claude-opus-4-1-20250805</code></td><td></td></tr>
+<tr><td>2025-08-05</td><td>Anthropic</td><td>◆</td><td><a href="https://www.anthropic.com/engineering/a-postmortem-of-three-recent-issues">three serving bugs (to 4 Sep)</a></td><td>—</td><td>0.8% of Sonnet 4 requests on average, 16% peak on 31 Aug</td></tr>
+<tr><td>2025-08-07</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/introducing-gpt-5/">GPT-5</a></td><td><code>gpt-5-2025-08-07</code></td><td>real-time router; GPT-4o, o3, o4-mini, 4.1, 4.5 removed from ChatGPT</td></tr>
+<tr><td>2025-08-08</td><td>OpenAI</td><td>◆</td><td><a href="https://openai.com/index/retiring-gpt-4o-and-older-models/">GPT-4o restored for paying users</a></td><td>—</td><td>date from Altman's posts via press; OpenAI confirms the sequence without a date</td></tr>
+<tr><td>2025-08-21</td><td>DeepSeek</td><td></td><td><a href="https://api-docs.deepseek.com/updates/">DeepSeek-V3.1</a></td><td><code>deepseek-chat / -reasoner</code></td><td>both endpoints upgraded in place</td></tr>
+<tr><td>2025-09-02</td><td>OpenAI</td><td>◆</td><td><a href="https://openai.com/index/building-more-helpful-chatgpt-experiences-for-everyone/">sensitive conversations to be routed to a reasoning model</a></td><td>—</td><td>gpt-5-chat-safety slug found by users 26–28 Sep; confirmed 27 Sep</td></tr>
+<tr><td>2025-09-10</td><td>—</td><td>◆</td><td><a href="https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/">Thinking Machines, batch-size nondeterminism</a></td><td>—</td><td>80 unique outputs from 1,000 runs at temperature 0</td></tr>
+<tr><td>2025-09-17</td><td>Anthropic</td><td>○</td><td><a href="https://www.anthropic.com/engineering/a-postmortem-of-three-recent-issues">postmortem of three issues</a></td><td>—</td><td>“We never reduce model quality due to demand, time of day, or server load.”</td></tr>
+<tr><td>2025-09-24</td><td>Alibaba</td><td></td><td><a href="https://www.alibabagroup.com/en-US/document-1911884625546838016">Qwen3-Max</a></td><td><code>qwen3-max</code></td><td>Apsara keynote date; recap dated 29 Sep</td></tr>
+<tr><td>2025-09-29</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-sonnet-4-5">Claude Sonnet 4.5</a></td><td><code>claude-sonnet-4-5-20250929</code></td><td>last dated Sonnet ID</td></tr>
+<tr><td>2025-11-12</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/gpt-5-1/">GPT-5.1</a></td><td><code>gpt-5.1, gpt-5.1-chat-latest</code></td><td>“GPT-5.1 Auto will continue to route each query”</td></tr>
+<tr><td>2025-11-17</td><td>xAI</td><td></td><td><a href="https://x.ai/news">Grok 4.1</a></td><td>—</td><td></td></tr>
+<tr><td>2025-11-18</td><td>Google</td><td></td><td><a href="https://ai.google.dev/gemini-api/docs/changelog">Gemini 3 Pro (preview)</a></td><td><code>gemini-3-pro-preview</code></td><td></td></tr>
+<tr><td>2025-11-24</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-opus-4-5">Claude Opus 4.5</a></td><td><code>claude-opus-4-5-20251101</code></td><td>ID date ≠ release date</td></tr>
+<tr><td>2025-12-01</td><td>DeepSeek</td><td></td><td><a href="https://api-docs.deepseek.com/updates/">DeepSeek-V3.2</a></td><td><code>deepseek-chat / -reasoner</code></td><td>in place</td></tr>
+<tr><td>2025-12-02</td><td>Mistral</td><td></td><td><a href="https://mistral.ai/news/mistral-3/">Mistral 3</a></td><td><code>mistral-large-2512</code></td><td></td></tr>
+<tr><td>2025-12-11</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/introducing-gpt-5-2/">GPT-5.2</a></td><td><code>gpt-5.2, gpt-5.2-chat-latest</code></td><td></td></tr>
+<tr><td>2025-12-11</td><td>—</td><td>○</td><td><a href="https://crfm.stanford.edu/fmti/December-2025">FMTI 2025: mean 41/100</a></td><td>—</td><td>down 17 from May 2024</td></tr>
+<tr><td>2026-01-21</td><td>Google</td><td>◆</td><td><a href="https://ai.google.dev/gemini-api/docs/changelog">-latest aliases → Gemini 3 previews</a></td><td><code>gemini-pro-latest, gemini-flash-latest</code></td><td>“hot-swapped with every new release”</td></tr>
+<tr><td>2026-01-22</td><td>OpenAI</td><td>◆</td><td><a href="https://help.openai.com/en/articles/9624314-model-release-notes">GPT-5.2 personality updates</a></td><td>—</td><td>also 4 Feb and 10 Feb</td></tr>
+<tr><td>2026-01-29</td><td>OpenAI</td><td>◆</td><td><a href="https://openai.com/index/retiring-gpt-4o-and-older-models/">GPT-4o, 4.1, o4-mini, GPT-5 to leave ChatGPT 13 Feb</a></td><td>—</td><td>“In the API, there are no changes at this time”</td></tr>
+<tr><td>2026-02-05</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-opus-4-6">Claude Opus 4.6</a></td><td><code>claude-opus-4-6</code></td><td>first dateless canonical ID</td></tr>
+<tr><td>2026-02-05</td><td>Anthropic</td><td>○</td><td><a href="https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions">dateless IDs are fixed snapshots</a></td><td>—</td><td>“Anthropic does not update the weights or configuration of an existing model ID.”</td></tr>
+<tr><td>2026-02-17</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-sonnet-4-6">Claude Sonnet 4.6</a></td><td><code>claude-sonnet-4-6</code></td><td></td></tr>
+<tr><td>2026-02-17</td><td>Alibaba</td><td></td><td><a href="https://www.alibabacloud.com/blog/qwen3-5-towards-native-multimodal-agents_602894">Qwen3.5</a></td><td><code>qwen3.5-plus</code></td><td>qwen-plus-latest “dynamically updated … without prior notice”</td></tr>
+<tr><td>2026-02-19</td><td>Google</td><td></td><td><a href="https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-1-pro/">Gemini 3.1 Pro (preview)</a></td><td><code>gemini-3.1-pro-preview</code></td><td></td></tr>
+<tr><td>2026-03-03</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/gpt-5-3-instant/">GPT-5.3 Instant</a></td><td><code>gpt-5.3-chat-latest</code></td><td></td></tr>
+<tr><td>2026-03-04</td><td>Anthropic</td><td>◆</td><td><a href="https://www.anthropic.com/engineering/april-23-postmortem">Claude Code default effort high → medium</a></td><td>—</td><td>reverted 7 Apr; caching bug 26 Mar–10 Apr; prompt line 16–20 Apr</td></tr>
+<tr><td>2026-03-05</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/introducing-gpt-5-4/">GPT-5.4</a></td><td><code>gpt-5.4, gpt-5.4-pro</code></td><td></td></tr>
+<tr><td>2026-03-09</td><td>Google</td><td>◆</td><td><a href="https://ai.google.dev/gemini-api/docs/changelog">gemini-3-pro-preview → 3.1 Pro preview</a></td><td><code>gemini-3-pro-preview</code></td><td>old ID re-targeted</td></tr>
+<tr><td>2026-03-18</td><td>OpenAI</td><td>◆</td><td><a href="https://help.openai.com/en/articles/9624314-model-release-notes">GPT-5.4 mini as fallback at rate limits</a></td><td>—</td><td>further fallback notes 9 Apr, 6 Jun</td></tr>
+<tr><td>2026-04-07</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/glasswing">Claude Mythos Preview</a></td><td><code>claude-mythos-preview</code></td><td>not generally available; deprecated 9 Jun</td></tr>
+<tr><td>2026-04-08</td><td>Meta</td><td></td><td><a href="https://about.fb.com/news/2026/04/introducing-muse-spark-meta-superintelligence-labs/">Muse Spark</a></td><td>—</td><td>proprietary; API private preview</td></tr>
+<tr><td>2026-04-16</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-opus-4-7">Claude Opus 4.7</a></td><td><code>claude-opus-4-7</code></td><td></td></tr>
+<tr><td>2026-04-23</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/introducing-gpt-5-5/">GPT-5.5</a></td><td><code>gpt-5.5, gpt-5.5-pro</code></td><td></td></tr>
+<tr><td>2026-04-23</td><td>Anthropic</td><td>○</td><td><a href="https://www.anthropic.com/engineering/april-23-postmortem">Claude Code postmortem</a></td><td>—</td><td>“We never intentionally degrade our models”</td></tr>
+<tr><td>2026-04-24</td><td>DeepSeek</td><td></td><td><a href="https://api-docs.deepseek.com/news/news260424">DeepSeek-V4 Preview</a></td><td><code>deepseek-v4-pro, deepseek-v4-flash</code></td><td>deepseek-chat “Currently routing to deepseek-v4-flash”; retired after 24 Jul</td></tr>
+<tr><td>2026-05-05</td><td>OpenAI</td><td>◆</td><td><a href="https://openai.com/index/gpt-5-5-instant/">GPT-5.5 Instant becomes ChatGPT default</a></td><td>—</td><td>in-place update 28 May, again 24 Jun</td></tr>
+<tr><td>2026-05-15</td><td>OpenAI</td><td>◆</td><td><a href="https://status.openai.com/incidents/01KRP6FM6HSKWB3MS1EJTY6AT4">“GPT5.5 Performance Degradation” incident</a></td><td>—</td><td>resolved 17 May</td></tr>
+<tr><td>2026-05-19</td><td>Google</td><td></td><td><a href="https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-5/">Gemini 3.5 Flash GA</a></td><td><code>gemini-3.5-flash</code></td><td>3.5 Pro announced for “next month”; not in the API model list as of 22 Sep</td></tr>
+<tr><td>2026-05-22</td><td>Mistral</td><td></td><td><a href="https://mistral.ai/news/vibe-remote-agents-mistral-medium-3-5/">Mistral Medium 3.5</a></td><td><code>mistral-medium-2604</code></td><td>version string says April</td></tr>
+<tr><td>2026-05-28</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-opus-4-8">Claude Opus 4.8</a></td><td><code>claude-opus-4-8</code></td><td></td></tr>
+<tr><td>2026-06-09</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-fable-5-mythos-5">Claude Fable 5 / Mythos 5</a></td><td><code>claude-fable-5, claude-mythos-5</code></td><td>one model, two safeguard configurations</td></tr>
+<tr><td>2026-06-11</td><td>OpenAI</td><td>◆</td><td><a href="https://developers.openai.com/api/docs/deprecations">GPT-5 and o3 snapshots deprecated</a></td><td><code>gpt-5-2025-08-07, o3-2025-04-16</code></td><td>shutdown 11 Dec 2026</td></tr>
+<tr><td>2026-06-12</td><td>Anthropic</td><td>◆</td><td><a href="https://www.anthropic.com/news/redeploying-fable-5">Fable 5 / Mythos 5 suspended; redeployed 1 Jul</a></td><td><code>claude-fable-5</code></td><td>same names, new safety classifier</td></tr>
+<tr><td>2026-06-30</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-sonnet-5">Claude Sonnet 5</a></td><td><code>claude-sonnet-5</code></td><td></td></tr>
+<tr><td>2026-07-09</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/gpt-5-6/">GPT-5.6 Sol / Terra / Luna</a></td><td><code>gpt-5.6-sol …</code></td><td></td></tr>
+<tr><td>2026-07-16</td><td>xAI</td><td></td><td><a href="https://x.ai/news/grok-4-5">Grok 4.5</a></td><td><code>grok-4.5</code></td><td></td></tr>
+<tr><td>2026-07-24</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/news/claude-opus-5">Claude Opus 5</a></td><td><code>claude-opus-5</code></td><td></td></tr>
+<tr><td>2026-08-03</td><td>Alibaba</td><td></td><td><a href="https://www.alibabacloud.com/en/press-room/alibaba-unveils-qwen3-8-max">Qwen3.8-Max</a></td><td><code>qwen3.8-max</code></td><td></td></tr>
+<tr><td>2026-08-06</td><td>OpenAI</td><td>◆</td><td><a href="https://deploymentsafety.openai.com/gpt-5-6-august-update">GPT-5.6 Sol / Luna “August” versions</a></td><td><code>gpt-5.6-sol, gpt-5.6-luna</code></td><td>same names; July versions remain in Codex and ChatGPT Work</td></tr>
+<tr><td>2026-08-12</td><td>xAI</td><td></td><td><a href="https://x.ai/news/grok-4-6">Grok 4.6</a></td><td>—</td><td></td></tr>
+<tr><td>2026-08-12</td><td>—</td><td>◆</td><td><a href="https://arxiv.org/abs/2608.11803">Abraham &amp; Bucknall, “Silent Updates”</a></td><td>—</td><td>arXiv 2608.11803: 0 of 9 providers verifiable</td></tr>
+<tr><td>2026-08-13</td><td>DeepSeek</td><td>◆</td><td><a href="https://api-docs.deepseek.com/news/news260813">DeepSeek-V4-Pro GA</a></td><td><code>deepseek-v4-pro</code></td><td>“Model names remain unchanged”</td></tr>
+<tr><td>2026-09-01</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/claude-fable-and-mythos-5-1">Claude Fable 5.1 / Mythos 5.1</a></td><td><code>claude-fable-5-1, claude-mythos-5-1</code></td><td>“the same model, but with different levels of safeguards”; page dated only “September 2026”</td></tr>
+<tr><td>2026-09-02</td><td>Google</td><td></td><td><a href="https://ai.google.dev/gemini-api/docs/changelog">Gemini 3.8 Flash GA</a></td><td><code>gemini-3.8-flash</code></td><td></td></tr>
+<tr><td>2026-09-03</td><td>OpenAI</td><td></td><td><a href="https://deploymentsafety.openai.com/gpt-6-astra">GPT-6 Astra</a></td><td><code>gpt-6-astra</code></td><td>system card dated 3 Sep; announcement page shows a 22 Sep update</td></tr>
+<tr><td>2026-09-10</td><td>DeepSeek</td><td></td><td><a href="https://api-docs.deepseek.com/news/news260910">DeepSeek-V4.1-Flash</a></td><td><code>deepseek-flash</code></td><td></td></tr>
+<tr><td>2026-09-14</td><td>OpenAI</td><td>◆</td><td><a href="https://help.openai.com/en/articles/6825453-chatgpt-release-notes">automatic Instant → Thinking switching retired</a></td><td>—</td><td>Plus and Pro</td></tr>
+<tr><td>2026-09-21</td><td>xAI</td><td></td><td><a href="https://x.ai/news/grok-4-7">Grok 4.7</a></td><td>—</td><td></td></tr>
+<tr><td>2026-09-22</td><td>OpenAI</td><td></td><td><a href="https://openai.com/index/introducing-gpt-6-sol-and-luna/">GPT-6 Sol / Luna</a></td><td><code>gpt-6-sol, gpt-6-luna</code></td><td></td></tr>
+<tr><td>2026-09-22</td><td>Anthropic</td><td></td><td><a href="https://www.anthropic.com/claude-opus-5-5">Claude Opus 5.5</a></td><td><code>claude-opus-5-5</code></td><td></td></tr>
+</tbody></table>
+</div>
+
+<h2>What this does to measurement</h2>
+
+<p><strong>A benchmark score names a snapshot, a harness and a date.</strong> The consumer product is rarely that snapshot. OpenAI's GPT-4.1 was API-only, with its improvements <a href="https://openai.com/index/gpt-4-1/">"gradually integrated into the existing GPT-4o"</a> in ChatGPT, so the "GPT-4o" in the app was not the <code>gpt-4o-2024-11-20</code> whose scores were published. The o1 in ChatGPT and the o1 in the API were, for a period, different post-trained models. GPT-5.6 Sol in ChatGPT and GPT-5.6 Sol in Codex were different models from 6 August 2026, distinguished only in a system card by "their month of release". Claude Code's default reasoning effort, which is not a property of the model, moved the product's results for five weeks in spring 2026. A published number for "GPT-5" or "Claude Opus 4.7" therefore constrains what a user of the app will get only loosely, and the looseness is not stated on the leaderboard.</p>
+
+<p><strong>Leaderboards were gamed by the naming freedom.</strong> The arena case is documented above. The quantitative point from <a href="https://arxiv.org/abs/2504.20879">Singh et al.</a> is not only the 27 private variants; it is the asymmetry in what the arena taught its participants. Google and OpenAI received "an estimated 19.2% and 20.4% of all test prompts on the arena", and fine-tuning on arena data at a 70% mix produced "relative gains of 112.3%" on ArenaHard. "205 models that have been silently deprecated" of 243 were mostly open-weight. The leaderboard was measuring, in part, access to the leaderboard.</p>
+
+<p><strong>Two runs of a fixed model do not agree.</strong> Even where the weights are pinned, the number is not. <a href="https://arxiv.org/abs/2408.04667">Atil et al.</a> found raw-output agreement across ten runs at temperature 0 ranging from 0% to about 99.6% depending on model and task, with best-versus-worst accuracy gaps "up to 70%" in the extreme case. <a href="https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/">Thinking Machines</a> traced the mechanism to batch-dependent kernels and showed that the first 102 tokens of 1,000 Feynman biographies agreed and the 103rd did not. Any single-run comparison between two providers is therefore a comparison between two draws, and a difference of a few points is inside the noise that a provider's own load pattern produces.</p>
+
+<p><strong>Papers that cite a model by name are not reproducible.</strong> <a href="https://arxiv.org/abs/2408.15409">De Wynter (2024)</a>, surveying more than 2,000 papers, found that "Many relevant SOTA papers did report model versioning (73%)", which leaves about a quarter that did not. <a href="https://arxiv.org/abs/2510.25506">Angermeir et al. (2025)</a> took 85 LLM studies from two top software-engineering venues, found 18 with artifacts using OpenAI models, 5 that could be executed, and reported: "For none of the five studies, we were able to fully reproduce the results." <a href="https://arxiv.org/abs/2512.00651">Siddiq et al. (2025)</a>, across 640 papers, found "199 papers failed to specify their exact prompt templates, and 88 lacked documentation of their inference parameters". A medical meta-analysis notes that "Many studies failed to report methodological details, including the version of ChatGPT" (<a href="https://arxiv.org/abs/2310.08410">arXiv 2310.08410</a>). Reporting the version, as Nature Machine Intelligence asked, helps only if the version is pinnable and stays available; OpenAI's GPT-4.5 preview was announced on 27 February 2025 and shut off in the API on 14 July 2025 (<a href="https://developers.openai.com/api/docs/deprecations">deprecations page</a>).</p>
+
+<p><strong>Nothing can be verified from outside.</strong> The <a href="https://arxiv.org/abs/2608.11803">Abraham and Bucknall</a> survey scores nine first-party API providers on whether their published safety documentation can be tied to the artifact a caller actually receives.</p>
+
+<figure>
+<svg viewBox="0 0 760 280" role="img" aria-label="Of nine API providers surveyed in Silent Updates (Abraham and Bucknall, August 2026), how many meet each disclosure criterion" font-size="11.5">
+<text x="0" y="14" font-size="14" font-weight="600" style="fill:var(--fg)">Of 9 API providers surveyed (Abraham &amp; Bucknall, Aug 2026), how many…</text>
+<line x1="345.0" y1="34" x2="345.0" y2="250" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="345.0" y="266" text-anchor="middle" style="fill:var(--muted)">0</text>
+<line x1="463.3" y1="34" x2="463.3" y2="250" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="463.3" y="266" text-anchor="middle" style="fill:var(--muted)">3</text>
+<line x1="581.7" y1="34" x2="581.7" y2="250" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="581.7" y="266" text-anchor="middle" style="fill:var(--muted)">6</text>
+<line x1="700.0" y1="34" x2="700.0" y2="250" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="700.0" y="266" text-anchor="middle" style="fill:var(--muted)">9</text>
+<text x="333" y="59" text-anchor="end" style="fill:var(--fg)">publish quantitative safety metrics</text>
+<path d="M345.0 44 H617.1 a4 4 0 0 1 4 4 v14 a4 4 0 0 1 -4 4 H345.0 Z" style="fill:var(--link)"/>
+<text x="629.1" y="59" font-weight="600" style="fill:var(--fg)">7/9</text>
+<text x="333" y="89" text-anchor="end" style="fill:var(--fg)">publish per-version safety comparisons</text>
+<path d="M345.0 74 H577.7 a4 4 0 0 1 4 4 v14 a4 4 0 0 1 -4 4 H345.0 Z" style="fill:var(--link)"/>
+<text x="589.7" y="89" font-weight="600" style="fill:var(--fg)">6/9</text>
+<text x="333" y="119" text-anchor="end" style="fill:var(--fg)">document snapshot-pinnable identifiers</text>
+<path d="M345.0 104 H538.2 a4 4 0 0 1 4 4 v14 a4 4 0 0 1 -4 4 H345.0 Z" style="fill:var(--link)"/>
+<text x="550.2" y="119" font-weight="600" style="fill:var(--fg)">5/9</text>
+<text x="333" y="149" text-anchor="end" style="fill:var(--fg)">publish alias → snapshot mappings</text>
+<path d="M345.0 134 H419.9 a4 4 0 0 1 4 4 v14 a4 4 0 0 1 -4 4 H345.0 Z" style="fill:var(--link)"/>
+<text x="431.9" y="149" font-weight="600" style="fill:var(--fg)">2/9</text>
+<text x="333" y="179" text-anchor="end" style="fill:var(--fg)">name a pinned, API-callable evaluated snapshot</text>
+<path d="M345.0 164 H380.4 a4 4 0 0 1 4 4 v14 a4 4 0 0 1 -4 4 H345.0 Z" style="fill:var(--link)"/>
+<text x="392.4" y="179" font-weight="600" style="fill:var(--fg)">1/9</text>
+<text x="333" y="209" text-anchor="end" style="fill:var(--fg)">version-bind content policies to a snapshot</text>
+<text x="353.0" y="209" font-weight="600" style="fill:var(--fg)">0/9</text>
+<text x="333" y="239" text-anchor="end" style="fill:var(--fg)">provide a verifiable API → evaluation round-trip</text>
+<text x="353.0" y="239" font-weight="600" style="fill:var(--fg)">0/9</text>
+</svg>
+<figcaption>Disclosure criteria met by nine first-party API providers, from <a href="https://arxiv.org/abs/2608.11803">Abraham and Bucknall, "Silent Updates", arXiv 2608.11803 (12 August 2026)</a>. The one provider naming a pinned, API-callable evaluated snapshot is Anthropic, scored as partial.</figcaption>
+</figure>
+
+<p>Their summary sentence: "no provider in our sample published information allowing an external party to verify that the artifact being served is the same one referred to in this documentation". Their proposal is a three-part trigger system (capability triggers that force re-evaluation, drift triggers that force a documentation update, component triggers that force deployment-level disclosure) and "a regulatory safe harbor for third-party benchmarking conducted in good faith for governance, auditing, or academic research purposes". A companion paper from April, <a href="https://arxiv.org/abs/2604.27789">Chishti et al.</a>, states the premise the same way: "hosted LLM services evolve continuously through provider-side updates without explicit version changes."</p>
+
+<h2>What the providers commit to</h2>
+
+<p>The commitments below are taken from each provider's current documentation. They are real, and they are narrower than they look: all of them concern the API; none concerns the consumer app beyond a release-notes page; none covers A/B tests, routing decisions or serving changes.</p>
+
+<table>
+<thead><tr><th></th><th>OpenAI</th><th>Anthropic</th><th>Google Gemini</th><th>DeepSeek</th></tr></thead>
+<tbody>
+<tr><td>Pinned snapshot in the API</td><td>Yes, dated: <a href="https://developers.openai.com/api/docs/models/gpt-4o">"Snapshots let you lock in a specific version of the model so that performance and behavior remain consistent."</a></td><td>Yes. Dated IDs before the 4.6 generation; from 4.6 the bare ID <a href="https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions">"maps to a single, fixed model snapshot"</a>.</td><td>Stable IDs <a href="https://ai.google.dev/gemini-api/docs/models">"usually don't change"</a>.</td><td>No pinning by name; endpoint names are upgraded in place. Weights for each version are published.</td></tr>
+<tr><td>What the bare name or alias does</td><td>Moves. <code>-chat-latest</code> aliases track the ChatGPT model; bare names receive the recommended version.</td><td>Pre-4.6 aliases <a href="https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions">"resolve to the most recent dated snapshot"</a>; 4.6+ IDs do not move.</td><td><code>-latest</code> is <a href="https://ai.google.dev/gemini-api/docs/models">"hot-swapped with every new release"</a>; preview IDs have been redirected (May 2025, March 2026).</td><td><code>deepseek-chat</code> upgraded in place at least eight times since May 2024; now routes to V4-Flash (<a href="https://api-docs.deepseek.com/updates/">changelog</a>).</td></tr>
+<tr><td>Notice before retirement</td><td><a href="https://developers.openai.com/api/docs/deprecations">"Generally available models: At least 6 months. Specialized variants … At least 3 months. Preview models may be retired with much shorter notice, such as 2 weeks."</a></td><td><a href="https://platform.claude.com/docs/en/about-claude/model-deprecations">"at least 60 days' notice before model retirement for publicly released models"</a>; weights preserved long-term.</td><td>Preview: <a href="https://ai.google.dev/gemini-api/docs/models">"at least 2 weeks notice"</a>; stable models carry a retirement date, about 12 months in the examples given.</td><td>Three months in the V4 case (24 April → 24 July 2026).</td></tr>
+<tr><td>Changelog for the consumer app</td><td><a href="https://help.openai.com/en/articles/9624314-model-release-notes">Model Release Notes</a>: dated same-name updates and rollbacks; no routing, fallback or A/B detail per request.</td><td><a href="https://support.claude.com/en/articles/12138966-release-notes">Release notes</a>: launches and deprecations.</td><td><a href="https://gemini.google/release-notes/">Gemini app release notes</a>: default-model swaps and "enhanced version" updates.</td><td>API changelog only.</td></tr>
+<tr><td>System prompt published</td><td>No; the <a href="https://model-spec.openai.com/2026-08-18.html">Model Spec</a> commits to "further transparency when we further adapt model behavior in significant ways".</td><td>Yes, dated, per model, since August 2024.</td><td>No.</td><td>No.</td></tr>
+<tr><td>A/B tests disclosed</td><td>Described in general terms once (May 2025); not logged.</td><td>Not logged.</td><td>Not logged.</td><td>Not logged.</td></tr>
+</tbody>
+</table>
+
+<p>Two providers outside the table: xAI publishes Grok's system prompts on GitHub, with at least one documented gap between the repository and production; Alibaba documents that <code>qwen-plus-latest</code> is "dynamically updated … without prior notice" while stable IDs are dated. Whether OpenAI's May 2025 promise to "proactively communicate about the updates we're making to the models in ChatGPT, whether 'subtle' or not" has been kept is a matter of reading the release notes: they have logged dated updates to GPT-4o, 5.2 and 5.5 Instant since then; they did not log the September 2025 safety routing before users found it, and they do not log fallbacks per conversation.</p>
+
+<h2>What regulation asks for</h2>
+
+<p>The idea that a model should carry a version is not new. The 2018 model-card proposal that every lab now cites lists, in its first section, <a href="https://arxiv.org/abs/1810.03993">"Model version. Which version of the model is it, and how does it differ from previous versions? This is useful for all stakeholders to track whether the model is the latest version, associate known bugs to the correct model versions, and aid in model comparisons."</a> The system cards of 2025–2026 do carry versions, and update cards exist for point releases (OpenAI's "Update to GPT-5 System Card: GPT-5.2", Anthropic's Opus 4.1 addendum) and, in the GPT-5.6 August case, for a same-name update. The same-name updates to GPT-4o in 2025 and GPT-5.2 in 2026 received a release-note line each.</p>
+
+<p>The EU AI Act's obligations for general-purpose model providers applied from 2 August 2025. Article 53 requires providers to <a href="https://artificialintelligenceact.eu/article/53/">"draw up and keep up-to-date the technical documentation of the model"</a> for the AI Office and national authorities, and to make documentation available to downstream providers. The Code of Practice of 10 July 2025 adds, in its transparency chapter, that signatories "will update the Model Documentation to reflect relevant changes … including in relation to updated versions of the same model", and its Model Documentation Form opens with "Model name and version identifier" (<a href="https://digital-strategy.ec.europa.eu/en/policies/contents-code-gpai">Commission page</a>). The recipients are regulators and downstream integrators. Nothing in Article 53 or the Code requires a provider to tell an end user that the model behind the app changed.</p>
+
+<p>California's SB 53, in force from 1 January 2026, requires a transparency report <a href="https://law.justia.com/codes/california/code-bpc/division-8/chapter-25-1/section-22757-12/">"Before, or concurrently with, deploying a new frontier model or a substantially modified version of an existing frontier model"</a>. Whether a same-name post-training update of the April 2025 kind is a "substantially modified version" under that statute is not something I could settle from the text I read. I found no version-disclosure provisions in the <a href="https://internationalaisafetyreport.org/publication/international-ai-safety-report-2026">International AI Safety Report 2026</a> or in the June 2026 US executive order on frontier models.</p>
+
+<p>The one systematic external measure of disclosure is Stanford's Foundation Model Transparency Index, which scores versioning directly ("Is there a disclosed protocol for versioning and deprecation of the model?"). In the December 2025 edition the companies not disclosing a versioning protocol were <a href="https://crfm.stanford.edu/fmti/December-2025">"Amazon, DeepSeek, Meta, Midjourney, Mistral, and xAI"</a>.</p>
+
+<figure>
+<svg viewBox="0 0 760 190" role="img" aria-label="Stanford Foundation Model Transparency Index, mean score out of 100, three editions" font-size="11.5">
+<text x="0" y="14" font-size="14" font-weight="600" style="fill:var(--fg)">Foundation Model Transparency Index, mean score out of 100</text>
+<line x1="60" y1="160.0" x2="740" y2="160.0" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="52" y="164.0" text-anchor="end" style="fill:var(--muted)">0</text>
+<line x1="60" y1="100.0" x2="740" y2="100.0" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="52" y="104.0" text-anchor="end" style="fill:var(--muted)">50</text>
+<line x1="60" y1="40.0" x2="740" y2="40.0" stroke-width="1" style="stroke:var(--rule)"/>
+<text x="52" y="44.0" text-anchor="end" style="fill:var(--muted)">100</text>
+<path d="M138 160.0 V119.6 a4 4 0 0 1 4 -4 h16 a4 4 0 0 1 4 4 V160.0 Z" style="fill:var(--link)"/>
+<text x="150" y="108.6" text-anchor="middle" font-weight="600" style="fill:var(--fg)">37</text>
+<text x="150" y="178.0" text-anchor="middle" style="fill:var(--muted)">Oct 2023</text>
+<path d="M288 160.0 V94.4 a4 4 0 0 1 4 -4 h16 a4 4 0 0 1 4 4 V160.0 Z" style="fill:var(--link)"/>
+<text x="300" y="83.4" text-anchor="middle" font-weight="600" style="fill:var(--fg)">58</text>
+<text x="300" y="178.0" text-anchor="middle" style="fill:var(--muted)">May 2024</text>
+<path d="M438 160.0 V114.8 a4 4 0 0 1 4 -4 h16 a4 4 0 0 1 4 4 V160.0 Z" style="fill:var(--link)"/>
+<text x="450" y="103.8" text-anchor="middle" font-weight="600" style="fill:var(--fg)">41</text>
+<text x="450" y="178.0" text-anchor="middle" style="fill:var(--muted)">Dec 2025</text>
+</svg>
+<figcaption>Mean score across the companies rated in each edition of the Foundation Model Transparency Index: <a href="https://arxiv.org/abs/2310.12941">October 2023</a> (10 companies, mean 37), <a href="https://crfm.stanford.edu/fmti/May-2024/index.html">May 2024</a> (mean 58), <a href="https://arxiv.org/abs/2512.10169">December 2025</a> (13 companies, mean 40.69; Stanford's own pages round it to 41 or 40). The 2024 edition was based on developer-submitted reports, which the index authors note as a change of method.</figcaption>
+</figure>
+
+<h2>The lock-in question</h2>
+
+<p>The question was whether users are, in effect, locked to whatever a few companies choose to disclose, framed as suits them. The record supports a narrower statement than that, in three parts.</p>
+
+<p><strong>What is locked.</strong> For the consumer apps, at every provider, the answer is yes. No product shows a version identifier next to a response. Routing, fallback and safety-model switching at OpenAI were each established by users reading network responses before or without an announcement; Google's preview redirect was announced as a convenience and experienced as a regression; Anthropic's harness-level changes were disclosed seven weeks after the first one. The framing concern is also supported in specific cases: the Llama 4 arena entry, and the private-variant practice that the arena permitted. Against that, the postmortems from OpenAI and Anthropic are detailed, dated and against interest, and Anthropic's immutable-ID policy is a direct answer to the problem this post describes. Both the framing and the candour are real. Neither can be checked from outside, which is the finding of the Abraham and Bucknall survey.</p>
+
+<p><strong>What is not locked.</strong> A caller who pins a dated OpenAI snapshot or a 4.6-or-later Anthropic ID gets fixed weights for the lifetime of that ID, subject to two things the pin does not cover: serving-stack changes (the August 2025 Anthropic bugs hit pinned callers as much as anyone) and the retirement clock (six months at OpenAI, sixty days at Anthropic). A user of open weights is not locked at all: a Hugging Face checkpoint is addressed by <a href="https://huggingface.co/docs/huggingface_hub/en/guides/download">a Git revision, "a branch name, a tag, or a commit hash"</a>, files are stored content-addressed by SHA-256, and DeepSeek, Qwen and Mistral publish each version as a separate artifact. That option now costs more than it did: Meta, the largest open-weight lab of 2023–2025, shipped its 2026 flagship, Muse Spark, as a proprietary model with a private-preview API (<a href="https://about.fb.com/news/2026/04/introducing-muse-spark-meta-superintelligence-labs/">announcement</a>), and I found no open-weight successor to Llama 4. The open-weight releases of the last year that I confirmed are Mistral 3 (Apache 2.0, December 2025), Qwen3.5 (February 2026) and DeepSeek V4 (April 2026, weights on Hugging Face), and the Chatbot Arena data shows 83 open-weight models sharing an estimated 29.7% of test prompts while Google and OpenAI alone received an estimated 39.6%.</p>
+
+<p><strong>What would make the label mean something.</strong> Every remedy in the sources is a version of the same three requirements, and none of them requires disclosing weights. A version identifier visible where the output is (the 2018 model-card field; OpenAI's own statement that "ChatGPT will tell you which model is active when asked" concedes that the information exists per response). A changelog that includes the things currently left out: A/B arms, routing and fallback rules, harness defaults, classifier changes (Nature Machine Intelligence's request for snapshot and date on the research side; Abraham and Bucknall's component triggers on the provider side). And a way to check: a hash or an evaluated-snapshot ID that a caller can compare against what they received, with a safe harbor for the people who do the comparing. Ordinary software has had the first two for decades; the third is what makes the first two more than a promise. Until then, the correct reading of any claim about "the model" is that it describes a service on a date, from the party that runs the service.</p>
+
+<h2>Sources</h2>
+
+<table>
+<thead><tr><th>Date</th><th>Source</th><th>What it supports</th></tr></thead>
+<tbody>
+<tr><td>Sep 2026</td><td><a href="https://www.anthropic.com/claude-fable-and-mythos-5-1">Anthropic: Introducing Claude Fable 5.1 and Claude Mythos 5.1</a></td><td>"the same model, but with different levels of safeguards"</td></tr>
+<tr><td>14 Sep 2026</td><td><a href="https://help.openai.com/en/articles/6825453-chatgpt-release-notes">OpenAI: ChatGPT release notes</a></td><td>Auto-switching retired; GPT-5.5 Instant updates; default swaps</td></tr>
+<tr><td>12 Aug 2026</td><td><a href="https://arxiv.org/abs/2608.11803">Abraham & Bucknall, Silent Updates, arXiv 2608.11803</a></td><td>9-provider survey; 0/9 verifiable; triggers and safe harbor</td></tr>
+<tr><td>12 Aug 2026</td><td><a href="https://community.openai.com/t/chatgpt-is-silently-downgrading-to-mini-models/1390114">OpenAI developer forum: silent downgrade to mini models</a></td><td>resolved_model_slug report</td></tr>
+<tr><td>6 Aug 2026</td><td><a href="https://deploymentsafety.openai.com/gpt-5-6-august-update">OpenAI: GPT-5.6 August update system card</a></td><td>July and August versions under the same names</td></tr>
+<tr><td>1 Jul 2026</td><td><a href="https://www.anthropic.com/news/redeploying-fable-5">Anthropic: Redeploying Fable 5</a></td><td>Suspension 12 June; redeployment with a new classifier</td></tr>
+<tr><td>15 May 2026</td><td><a href="https://status.openai.com/incidents/01KRP6FM6HSKWB3MS1EJTY6AT4">OpenAI status: GPT5.5 Performance Degradation</a></td><td>Incident 15–17 May</td></tr>
+<tr><td>30 Apr 2026</td><td><a href="https://arxiv.org/abs/2604.27789">Chishti et al., Test Before You Deploy, arXiv 2604.27789</a></td><td>"provider-side updates without explicit version changes"</td></tr>
+<tr><td>24 Apr 2026</td><td><a href="https://api-docs.deepseek.com/news/news260424">DeepSeek: V4 Preview</a></td><td>deepseek-chat routing to V4-Flash; retirement date</td></tr>
+<tr><td>23 Apr 2026</td><td><a href="https://www.anthropic.com/engineering/april-23-postmortem">Anthropic: An update on recent Claude Code quality reports</a></td><td>Effort default, caching bug, system-prompt line, 3% drop</td></tr>
+<tr><td>18 Mar 2026</td><td><a href="https://help.openai.com/en/articles/9624314-model-release-notes">OpenAI: Model release notes</a></td><td>GPT-4o updates 2024–2025 and rollback; GPT-5.2 updates; mini fallback</td></tr>
+<tr><td>Feb 2026</td><td><a href="https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions">Anthropic docs: Model IDs and versions</a></td><td>Fixed dateless IDs; alias behaviour</td></tr>
+<tr><td>29 Jan 2026</td><td><a href="https://openai.com/index/retiring-gpt-4o-and-older-models/">OpenAI: Retiring GPT-4o and older models</a></td><td>"first deprecated it and later restored access"</td></tr>
+<tr><td>Jan 2026</td><td><a href="https://law.justia.com/codes/california/code-bpc/division-8/chapter-25-1/section-22757-12/">California Business and Professions Code §22757.12 (SB 53)</a></td><td>Transparency report for a "substantially modified version"</td></tr>
+<tr><td>Dec 2025</td><td><a href="https://crfm.stanford.edu/fmti/December-2025">Stanford CRFM: Foundation Model Transparency Index 2025</a>; <a href="https://arxiv.org/abs/2512.10169">arXiv 2512.10169</a></td><td>Mean 41; versioning indicator; non-disclosers</td></tr>
+<tr><td>29 Nov 2025</td><td><a href="https://arxiv.org/abs/2512.00651">Siddiq et al., arXiv 2512.00651</a></td><td>199 of 640 papers without prompt templates; 88 without parameters</td></tr>
+<tr><td>12 Nov 2025</td><td><a href="https://openai.com/index/gpt-5-1/">OpenAI: GPT-5.1</a></td><td>"GPT-5.1 Auto will continue to route each query"; legacy dropdown</td></tr>
+<tr><td>29 Oct 2025</td><td><a href="https://arxiv.org/abs/2510.25506">Angermeir et al., arXiv 2510.25506</a></td><td>0 of 5 studies reproduced</td></tr>
+<tr><td>27 Sep 2025</td><td><a href="https://x.com/nickaturley/status/1972031686318895253">Nick Turley on X</a>; <a href="https://lex-au.github.io/Whitepaper-GPT-5-Safety-Classifiers/">user write-up</a></td><td>Safety routing confirmed; gpt-5-chat-safety slug</td></tr>
+<tr><td>17 Sep 2025</td><td><a href="https://www.anthropic.com/engineering/a-postmortem-of-three-recent-issues">Anthropic: A postmortem of three recent issues</a>; <a href="https://status.claude.com/incidents/72f99lh1cj2c">status page, 9 Sep</a></td><td>Three serving bugs; 0.8% / 16%; "never reduce model quality"</td></tr>
+<tr><td>10 Sep 2025</td><td><a href="https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/">Thinking Machines: Defeating Nondeterminism in LLM Inference</a></td><td>80 unique completions of 1,000; batch invariance</td></tr>
+<tr><td>2 Sep 2025</td><td><a href="https://openai.com/index/building-more-helpful-chatgpt-experiences-for-everyone/">OpenAI: Building more helpful ChatGPT experiences</a></td><td>Routing of sensitive conversations announced</td></tr>
+<tr><td>8 Aug 2025</td><td><a href="https://techcrunch.com/2025/08/08/sam-altman-addresses-bumpy-gpt-5-rollout-bringing-4o-back-and-the-chart-crime/">TechCrunch on Altman's AMA</a>; <a href="https://x.com/sama/status/1953953990372471148">Altman on X</a></td><td>Autoswitcher outage; GPT-4o restored</td></tr>
+<tr><td>7 Aug 2025</td><td><a href="https://openai.com/index/introducing-gpt-5/">OpenAI: Introducing GPT-5</a></td><td>Router; models replaced in ChatGPT</td></tr>
+<tr><td>12 Jul 2025</td><td><a href="https://www.engadget.com/ai/grok-team-apologizes-for-the-chatbots-horrific-behavior-and-blames-mechahitler-on-a-bad-update-184520189.html">Engadget on xAI's apology</a></td><td>7 July prompt update, ~16 hours</td></tr>
+<tr><td>10 Jul 2025</td><td><a href="https://digital-strategy.ec.europa.eu/en/policies/contents-code-gpai">European Commission: GPAI Code of Practice</a>; <a href="https://artificialintelligenceact.eu/article/53/">AI Act Article 53</a></td><td>Documentation duties; "updated versions of the same model"</td></tr>
+<tr><td>28 May 2025</td><td><a href="https://huggingface.co/deepseek-ai/DeepSeek-R1-0528">DeepSeek-R1-0528 model card</a>; <a href="https://api-docs.deepseek.com/news/news250528">API note</a></td><td>12K → 23K tokens; "No change to API usage"</td></tr>
+<tr><td>15 May 2025</td><td><a href="https://x.com/xai/status/1923183620606619649">xAI on X</a>; <a href="https://github.com/xai-org/grok-prompts">grok-prompts repository</a>; <a href="https://github.com/xai-org/grok-prompts/issues/38">issue #38</a></td><td>Unauthorized prompt change; prompts published; repository gap</td></tr>
+<tr><td>6–8 May 2025</td><td><a href="https://ai.google.dev/gemini-api/docs/changelog">Gemini API changelog</a>; <a href="https://x.com/OfficialLoganK/status/1919770689537474858">Kilpatrick on X</a>; <a href="https://discuss.ai.google.dev/t/urgent-feedback-call-for-correction-a-serious-breach-of-developer-trust-and-stability-update-google-formally-responds-8-days-later/82399">developer forum</a></td><td>03-25 → 05-06 redirect and developer response; later redirects</td></tr>
+<tr><td>2 May 2025</td><td><a href="https://openai.com/index/expanding-on-sycophancy/">OpenAI: Expanding on what we missed with sycophancy</a>; <a href="https://openai.com/index/sycophancy-in-gpt-4o/">Sycophancy in GPT-4o</a></td><td>Five updates; A/B tests; reward signal; disclosure pledge</td></tr>
+<tr><td>29 Apr 2025</td><td><a href="https://arxiv.org/abs/2504.20879">Singh et al., The Leaderboard Illusion, arXiv 2504.20879</a></td><td>27 private variants; prompt-share asymmetry; silent deprecations</td></tr>
+<tr><td>14 Apr 2025</td><td><a href="https://openai.com/index/gpt-4-1/">OpenAI: GPT-4.1</a></td><td>API-only; "gradually integrated into the existing GPT-4o"</td></tr>
+<tr><td>7–8 Apr 2025</td><td><a href="https://x.com/lmarena_ai/status/1909397817434816562">LMArena on X</a>; <a href="https://x.com/Ahmad_Al_Dahle/status/1909302532306092107">Al-Dahle on X</a>; <a href="https://www.theregister.com/2025/04/08/meta_llama4_cheating/">The Register</a>; <a href="https://arena.ai/blog/policy">Arena policy</a></td><td>Llama 4 experimental variant; policy change</td></tr>
+<tr><td>5 Apr 2025</td><td><a href="https://ai.meta.com/blog/llama-4-multimodal-intelligence/">Meta: Llama 4</a></td><td>"experimental chat version" cited for the arena score</td></tr>
+<tr><td>25 Mar 2025</td><td><a href="https://huggingface.co/deepseek-ai/DeepSeek-V3-0324">DeepSeek-V3-0324 model card</a>; <a href="https://api-docs.deepseek.com/news/news250325">API note</a></td><td>Same structure; benchmark deltas; "API usage remains unchanged"</td></tr>
+<tr><td>17 Dec 2024</td><td><a href="https://openai.com/index/o1-and-new-tools-for-developers/">OpenAI: o1 and new tools for developers</a></td><td>API o1 a different post-trained version from ChatGPT o1</td></tr>
+<tr><td>22 Oct 2024</td><td><a href="https://www.anthropic.com/news/3-5-models-and-computer-use">Anthropic: upgraded Claude 3.5 Sonnet</a></td><td>Same name, new snapshot</td></tr>
+<tr><td>30 Aug 2024</td><td><a href="https://www.nature.com/articles/s42256-024-00896-6">Nature Machine Intelligence editorial</a></td><td>Report exact version and access date; drift; deprecation</td></tr>
+<tr><td>26 Aug 2024</td><td><a href="https://platform.claude.com/docs/en/release-notes/system-prompts/overview">Anthropic: system prompt release notes</a></td><td>"periodically updated … do not apply to the Claude API"</td></tr>
+<tr><td>Aug 2024</td><td><a href="https://arxiv.org/abs/2408.04667">Atil et al., LLM Stability, arXiv 2408.04667</a>; <a href="https://arxiv.org/abs/2408.15409">de Wynter, arXiv 2408.15409</a></td><td>Non-repeatability at temperature 0; 73% of papers report versions</td></tr>
+<tr><td>6 Aug 2024</td><td><a href="https://openai.com/index/introducing-structured-outputs-in-the-api/">OpenAI: Structured Outputs</a>; <a href="https://developers.openai.com/api/docs/models/gpt-4o">gpt-4o docs</a>; <a href="https://developers.openai.com/api/docs/models/chatgpt-4o-latest">chatgpt-4o-latest docs</a></td><td>GPT-4o snapshots; alias description</td></tr>
+<tr><td>25 Jan 2024</td><td><a href="https://openai.com/index/new-embedding-models-and-api-updates/">OpenAI: New embedding models and API updates</a></td><td>0125 "laziness" note; gpt-4-turbo-preview alias</td></tr>
+<tr><td>8 Dec 2023</td><td><a href="https://twitter.com/ChatGPTapp/status/1732979491071549792">ChatGPT on X</a>; <a href="https://twitter.com/ChatGPTapp/status/1733263005192994846">follow-up</a></td><td>"haven't updated the model since Nov 11th"</td></tr>
+<tr><td>6 Nov 2023</td><td><a href="https://openai.com/index/new-models-and-developer-products-announced-at-devday/">OpenAI: DevDay announcements</a></td><td>Withdrawn auto-upgrade note</td></tr>
+<tr><td>Jul 2023</td><td><a href="https://arxiv.org/abs/2307.09009">Chen, Zaharia & Zou, arXiv 2307.09009</a>; <a href="https://www.aisnakeoil.com/p/is-gpt-4-getting-worse-over-time">Narayanan & Kapoor, AI Snake Oil</a></td><td>March vs June 2023 figures; capability-versus-behaviour critique</td></tr>
+<tr><td>13 Jun 2023</td><td><a href="https://openai.com/index/function-calling-and-other-api-updates/">OpenAI: Function calling and other API updates</a></td><td>Stable names auto-upgraded on 27 June</td></tr>
+<tr><td>1 Mar 2023</td><td><a href="https://openai.com/index/introducing-chatgpt-and-whisper-apis/">OpenAI: Introducing ChatGPT and Whisper APIs</a></td><td>Alias-versus-snapshot convention</td></tr>
+<tr><td>Oct 2018</td><td><a href="https://arxiv.org/abs/1810.03993">Mitchell et al., Model Cards for Model Reporting</a></td><td>"Model version" field</td></tr>
+<tr><td>current</td><td><a href="https://developers.openai.com/api/docs/deprecations">OpenAI deprecations</a>; <a href="https://platform.claude.com/docs/en/about-claude/model-deprecations">Anthropic deprecations</a>; <a href="https://ai.google.dev/gemini-api/docs/models">Gemini models</a>; <a href="https://api-docs.deepseek.com/updates/">DeepSeek changelog</a>; <a href="https://www.alibabacloud.com/help/en/model-studio/qwen-plus">Alibaba qwen-plus</a>; <a href="https://huggingface.co/docs/huggingface_hub/en/guides/download">Hugging Face download guide</a></td><td>Notice periods; alias rules; in-place upgrades; revision pinning</td></tr>
+</tbody>
+</table>
+
+
+</article>
+</main>
+<footer>© Tamara Shostak · <a href="https://github.com/nikotakx">GitHub</a> · <a href="https://il.linkedin.com/in/tamara-shostak-667197111">LinkedIn</a></footer>
+</body>
+</html>
